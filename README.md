@@ -1,5 +1,7 @@
 # pantry-tracker-api
 
+[![CI](https://github.com/Rustem-Stilinski/pantry-tracker-api/actions/workflows/ci.yml/badge.svg)](https://github.com/Rustem-Stilinski/pantry-tracker-api/actions/workflows/ci.yml)
+
 REST API for **Used Items Log**: a shared log of things that get used up (paper towels, coffee pods,
 printer paper), with monthly totals so you know what to restock. Several people share one log by
 joining it with an invite code.
@@ -54,8 +56,12 @@ docker compose --profile full up --build    # then open http://localhost:4200
 ## Tests
 
 ```bash
-mvn test        # API tests on in-memory H2, no database needed
+mvn test              # API tests on in-memory H2, no database needed
+./ci/smoke-test.sh    # end-to-end check against a running API (e.g. after docker compose up)
 ```
+
+CI (`.github/workflows/ci.yml`) runs on every push and pull request: the Maven build and tests, the
+smoke test against a real PostgreSQL, and a Docker image build.
 
 ## API
 
