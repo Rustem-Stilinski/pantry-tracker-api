@@ -1,0 +1,47 @@
+# Local stack for the API.
+#
+#   docker compose up --build                  PostgreSQL + API on http://localhost:8080
+#   docker compose up -d db                    just the database (then run the API from your IDE)
+#   docker compose --profile full up --build   also the web app on http://localhost:4200
+#                                              (needs pantry-tracker-web cloned next to this repo)
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: usedlog
+      POSTGRES_USER: usedlog
+      POSTGRES_PASSWORD: usedlog
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U usedlog -d usedlog"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build: .
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/usedlog
+      DATABASE_USERNAME: usedlog
+      DATABASE_PASSWORD: usedlog
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+
+  web:
+    profiles: ["full"]
+    build: ../pantry-tracker-web
+    environment:
+      API_URL: http://api:8080
+    depends_on:
+      - api
+    ports:
+      - "4200:80"
+
+volumes:
+  db-data:

@@ -1,0 +1,6 @@
+# Tests run against in-memory H2 in PostgreSQL mode, so they need no database server.
+spring:
+  datasource:
+    url: jdbc:h2:mem:usedlog;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
