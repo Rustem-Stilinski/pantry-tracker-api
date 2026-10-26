@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.usedlog.common.Text;
+import com.usedlog.common.MonthRange;
 import com.usedlog.entry.EntryDtos.CreateEntryRequest;
 import com.usedlog.entry.EntryDtos.EntryResponse;
 import com.usedlog.entry.EntryDtos.FrequentItem;

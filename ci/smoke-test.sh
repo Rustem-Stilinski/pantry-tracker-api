@@ -75,6 +75,38 @@ status=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X DELETE -H
 call GET "/api/households/$hid/entries?month=$month&tz=UTC" | jq -e 'length == 1' > /dev/null
 check "removed an entry"
 
+# ---- Prices: two receipts from different stores, then prices, comparison and spending.
+receipt() { # store, minutes ago, egg price
+  local at; at=$(date -u -d "-$2 minutes" +%Y-%m-%dT%H:%M:%SZ)
+  call POST "/api/households/$hid/receipts" "{\"storeName\":\"$1\",\"purchasedAt\":\"$at\",\"tax\":0.10,\"items\":[
+    {\"name\":\"Eggs, 12 ct\",\"receiptText\":\"LG EGGS 12CT\",\"quantity\":1,\"unit\":\"pcs\",\"unitPrice\":$3,\"lineTotal\":$3,\"category\":\"Dairy & eggs\"},
+    {\"name\":\"Bananas\",\"quantity\":2,\"unit\":\"lb\",\"unitPrice\":0.59,\"lineTotal\":1.18,\"category\":\"Produce\"}]}"
+}
+receipt "Aldi" 120 2.79 | jq -e '.total == 4.07 and (.items | length) == 2' > /dev/null
+check "saved a receipt (total = lines + tax)"
+receipt "Giant" 60 3.49 | jq -e '.priceChanges | length == 1 and .[0].changePercent == 25.1' > /dev/null
+check "second receipt flags eggs +25.1%"
+
+call GET "/api/households/$hid/prices" \
+  | jq -e '(.items | length) == 2 and (.changes | length) == 1 and (.items[] | select(.itemName == "Eggs, 12 ct") | .lowestStore == "Aldi")' > /dev/null
+check "price list with latest, lowest and changes"
+
+call GET "/api/households/$hid/prices/history?item=Eggs%2C%2012%20ct" | jq -e '(.points | length) == 2' > /dev/null
+check "item price history"
+
+call GET "/api/households/$hid/prices/compare" | jq -e '.[0].stores[0].storeName == "Aldi"' > /dev/null
+check "store comparison puts the cheaper store first"
+
+call GET "/api/households/$hid/spending?tz=UTC" | jq -e '.total >= 8.84 and (.months | length) == 12' > /dev/null
+check "monthly spending"
+
+# Reading photos: 503 without an API key (as in CI); with a key, a fake photo can't be read (4xx/5xx).
+printf 'not really a photo' > /tmp/smoke-receipt.jpg
+status=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST -H "X-XSRF-TOKEN: $(xsrf)" \
+  -F "photos=@/tmp/smoke-receipt.jpg;type=image/jpeg" "$BASE/api/households/$hid/receipts/read")
+[[ "$status" == "503" || "$status" == "502" || "$status" == "422" ]] || { echo "unexpected $status from receipts/read"; exit 1; }
+check "receipt reading answers cleanly ($status)"
+
 status=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST -H "X-XSRF-TOKEN: $(xsrf)" "$BASE/api/auth/logout")
 [[ "$status" == "204" ]] || { echo "expected 204 from logout, got $status"; exit 1; }
 status=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$BASE/api/households")

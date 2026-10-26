@@ -1,0 +1,53 @@
+{
+  "type": "object",
+  "properties": {
+    "storeName": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "description": "The store's everyday name, e.g. Giant or Trader Joe's."
+    },
+    "purchaseDate": {
+      "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }],
+      "description": "Purchase date as printed, YYYY-MM-DD."
+    },
+    "purchaseTime": {
+      "anyOf": [{ "type": "string", "pattern": "^[0-2][0-9]:[0-5][0-9]$" }, { "type": "null" }],
+      "description": "Purchase time as printed, 24-hour HH:MM."
+    },
+    "currency": {
+      "type": "string",
+      "description": "ISO 4217 code, USD unless the receipt shows another currency."
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "receiptText": { "type": "string", "description": "The line exactly as printed." },
+          "name": { "type": "string", "description": "Readable product name with size or count when printed." },
+          "quantity": { "type": "number", "description": "Weight for items sold by weight, otherwise the count." },
+          "unit": { "type": "string", "description": "lb, oz, kg, g for weighed items; pcs for counted items; gal, L etc. only when printed." },
+          "unitPrice": { "type": "number", "description": "Price of one unit after discounts on this line." },
+          "lineTotal": { "type": "number", "description": "Amount paid for this line after its discounts." },
+          "category": {
+            "type": "string",
+            "enum": [
+              "Produce", "Meat & seafood", "Dairy & eggs", "Bakery", "Pantry", "Frozen", "Snacks",
+              "Drinks", "Household", "Personal care", "Baby", "Pet", "Other"
+            ]
+          }
+        },
+        "required": ["receiptText", "name", "quantity", "unit", "unitPrice", "lineTotal", "category"],
+        "additionalProperties": false
+      }
+    },
+    "subtotal": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+    "tax": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+    "total": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+    "notes": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "description": "One short sentence on anything to double-check; null when everything is clear."
+    }
+  },
+  "required": ["storeName", "purchaseDate", "purchaseTime", "currency", "items", "subtotal", "tax", "total", "notes"],
+  "additionalProperties": false
+}

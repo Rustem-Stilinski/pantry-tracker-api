@@ -15,6 +15,11 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  servlet:
+    multipart:
+      # Up to 4 receipt photos per request (the web app shrinks them first).
+      max-file-size: 8MB
+      max-request-size: 34MB
 
 server:
   port: ${PORT:8080}
@@ -32,3 +37,10 @@ management:
     web:
       exposure:
         include: health
+
+app:
+  receipts:
+    # Reading receipt photos uses the Claude API. Leave the key empty to offer manual entry only.
+    anthropic-api-key: ${ANTHROPIC_API_KEY:}
+    model: ${ANTHROPIC_MODEL:claude-haiku-5-5}
+    api-url: ${ANTHROPIC_API_URL:https://api.anthropic.com}
