@@ -117,6 +117,19 @@ saved or removed, the API notifies every tab in that household and they re-fetch
 kept in memory, which is fine for one instance. If you run several, publish the events through
 something shared, such as PostgreSQL `LISTEN/NOTIFY`, Redis, or SNS.
 
+## Deploying to Render (current)
+
+Live at https://pantry-tracker-api-mys0.onrender.com, with a Render PostgreSQL database. The web app
+forwards `/api` here, so people use the app's address, not this one.
+
+- **Environment:** `DATABASE_URL` (JDBC URL to the database's internal host), `DATABASE_USERNAME`,
+  `DATABASE_PASSWORD`, `COOKIE_SECURE=true`. Render sets `PORT`.
+- **Deploys:** CI's last job calls the service's deploy hook after the build, tests, smoke test and
+  Docker build all pass on `main`. The hook URL is the `RENDER_DEPLOY_HOOK_URL` repository secret
+  (Render service > Settings > Deploy Hook). Without the secret the job just skips with a warning.
+- **Free tier:** the service sleeps after about 15 minutes idle and takes a couple of minutes to
+  wake; the free database expires 30 days after creation unless upgraded.
+
 ## Deploying to AWS
 
 1. **Database:** RDS for PostgreSQL. Pass its JDBC URL and credentials as `DATABASE_URL`,
