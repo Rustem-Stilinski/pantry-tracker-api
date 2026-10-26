@@ -35,8 +35,9 @@ import tools.jackson.databind.json.JsonMapper;
  * The reply is constrained to receipt-schema.json with structured outputs, so it always parses.
  *
  * Configuration (application.yml / environment):
- *   ANTHROPIC_API_KEY   required to turn the feature on
- *   ANTHROPIC_MODEL     default claude-haiku-5-5 (fast and inexpensive, built for extraction)
+ *   ANTHROPIC_API_KEY        required to turn the feature on
+ *   ANTHROPIC_WORKSPACE_ID   only for a key that isn't scoped to one workspace
+ *   ANTHROPIC_MODEL          default claude-haiku-5-5 (fast and inexpensive, built for extraction)
  */
 @Component
 public class AnthropicReceiptReader implements ReceiptReader {
@@ -76,14 +77,17 @@ public class AnthropicReceiptReader implements ReceiptReader {
             """;
 
     private final String apiKey;
+    private final String workspaceId;
     private final String model;
     private final RestClient http;
     private final Map<String, Object> schema;
 
     public AnthropicReceiptReader(@Value("${app.receipts.anthropic-api-key:}") String apiKey,
+                                  @Value("${app.receipts.workspace-id:}") String workspaceId,
                                   @Value("${app.receipts.model:claude-haiku-5-5}") String model,
                                   @Value("${app.receipts.api-url:https://api.anthropic.com}") String apiUrl) {
         this.apiKey = apiKey == null ? "" : apiKey.trim();
+        this.workspaceId = workspaceId == null ? "" : workspaceId.trim();
         this.model = model;
 
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(
@@ -106,8 +110,13 @@ public class AnthropicReceiptReader implements ReceiptReader {
         try {
             responseBody = http.post()
                     .uri("/v1/messages")
-                    .header("x-api-key", apiKey)
-                    .header("anthropic-version", API_VERSION)
+                    .headers(headers -> {
+                        headers.setBearerAuth(apiKey);
+                        headers.set("anthropic-version", API_VERSION);
+                        if (!workspaceId.isEmpty()) {
+                            headers.set("anthropic-workspace-id", workspaceId);
+                        }
+                    })
                     .contentType(MediaType.APPLICATION_JSON)
                     .accept(MediaType.APPLICATION_JSON)
                     .body(requestBody)
@@ -116,6 +125,11 @@ public class AnthropicReceiptReader implements ReceiptReader {
         } catch (RestClientResponseException ex) {
             int status = ex.getStatusCode().value();
             log.warn("Claude API returned {} while reading a receipt: {}", status, abbreviate(ex.getResponseBodyAsString()));
+            if (status == 400 && ex.getResponseBodyAsString().contains("anthropic-workspace-id")) {
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
+                        "The server's Claude API key isn't scoped to a workspace. Set ANTHROPIC_WORKSPACE_ID, "
+                                + "or use a key created for one workspace. You can enter this receipt by hand meanwhile.");
+            }
             if (status == 401 || status == 403) {
                 throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
                         "The server's Claude API key was rejected. Check ANTHROPIC_API_KEY, or enter this receipt by hand.");

@@ -42,5 +42,7 @@ app:
   receipts:
     # Reading receipt photos uses the Claude API. Leave the key empty to offer manual entry only.
     anthropic-api-key: ${ANTHROPIC_API_KEY:}
+    # Only needed when the key isn't scoped to a single workspace.
+    workspace-id: ${ANTHROPIC_WORKSPACE_ID:}
     model: ${ANTHROPIC_MODEL:claude-haiku-5-5}
     api-url: ${ANTHROPIC_API_URL:https://api.anthropic.com}

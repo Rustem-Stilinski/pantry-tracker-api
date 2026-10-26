@@ -2,9 +2,10 @@
 
 [![CI](https://github.com/Rustem-Stilinski/pantry-tracker-api/actions/workflows/ci.yml/badge.svg)](https://github.com/Rustem-Stilinski/pantry-tracker-api/actions/workflows/ci.yml)
 
-REST API for **Used Items Log**: a shared log of things that get used up (paper towels, coffee pods,
-printer paper), with monthly totals so you know what to restock. Several people share one log by
-joining it with an invite code.
+REST API for **Pantry Tracker**: a shared log of things that get used up (paper towels, coffee pods,
+printer paper) and of what they cost. Snap a receipt and the API reads the items and prices with
+Claude, then tracks price history, compares stores and totals spending. Several people share one log
+by joining it with an invite code.
 
 The web app lives in [pantry-tracker-web](https://github.com/Rustem-Stilinski/pantry-tracker-web).
 
@@ -17,9 +18,11 @@ src/main/java/com/usedlog/
 ├── security/   session + CSRF setup, user lookup
 ├── household/  shared logs and invite codes
 ├── entry/      entries, monthly totals, frequent items
+├── price/      receipts, reading photos with Claude, prices, stores, spending
 ├── events/     Server-Sent Events broadcaster
 └── common/     error handling, text helpers
-src/main/resources/db/migration/V1__init.sql
+src/main/resources/db/migration/   V1 (log), V2 (prices)
+src/main/resources/receipt-schema.json   the shape Claude must return for a receipt
 src/test/java/com/usedlog/UsedLogApiTests.java
 ```
 
@@ -84,6 +87,15 @@ always in `detail`. Everything except register, login and health requires a sign
 | GET | `/api/households/{id}/totals?month=2026-10&tz=America/New_York` | Per-item totals for the month |
 | GET | `/api/households/{id}/items/frequent?limit=8` | Most-logged items (last 60 days) with last amount |
 | GET | `/api/households/{id}/events` | Server-Sent Events stream (`entries-changed`) |
+| POST | `/api/households/{id}/receipts/read` | 1–4 receipt photos (multipart `photos`) → a draft to check; nothing saved |
+| POST | `/api/households/{id}/receipts` | Save a checked receipt; returns price changes it revealed |
+| GET | `/api/households/{id}/receipts?month=2026-10&tz=…` | Receipts in a month |
+| GET / DELETE | `/api/households/{id}/receipts/{receiptId}` | One receipt with its lines |
+| GET | `/api/households/{id}/prices` | Every item's latest, lowest and average price, plus changes of 10%+ in the last 60 days |
+| GET | `/api/households/{id}/prices/history?item=Eggs, 12 ct&unit=pcs` | One item's purchases over time and by store |
+| GET | `/api/households/{id}/prices/compare` | Items bought at 2+ stores, cheapest store first |
+| GET | `/api/households/{id}/spending?year=2026&tz=…` | Spending per month, by store and category |
+| GET | `/api/households/{id}/stores` | Store names, for autocomplete |
 | GET | `/actuator/health` | Health check |
 
 Example entry:
@@ -95,6 +107,21 @@ POST /api/households/{id}/entries
 ```
 
 `usedAt` is optional (defaults to now) and can't be in the future.
+
+## Reading receipts with Claude
+
+`POST /receipts/read` sends the photos to the Claude Messages API (`claude-haiku-5-5` by default) with
+[structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs), so the
+reply always matches `receipt-schema.json`: store, date, each line's readable name, quantity, unit,
+unit price, line total and category, plus subtotal, tax, total and a note on anything unclear. The
+household's existing item and store names go into the prompt so the same product keeps the same name.
+A receipt costs well under a cent.
+
+| Variable | |
+|---|---|
+| `ANTHROPIC_API_KEY` | Turns reading on. Create one at [platform.claude.com/settings/keys](https://platform.claude.com/settings/keys); a key scoped to one workspace is simplest. Without it, the read endpoint answers 503 and the app offers manual entry. |
+| `ANTHROPIC_WORKSPACE_ID` | Only for a key that isn't scoped to a workspace. |
+| `ANTHROPIC_MODEL` | Optional; default `claude-haiku-5-5`. |
 
 ## How it works
 
@@ -123,7 +150,7 @@ Live at https://pantry-tracker-api-mys0.onrender.com, with a Render PostgreSQL d
 forwards `/api` here, so people use the app's address, not this one.
 
 - **Environment:** `DATABASE_URL` (JDBC URL to the database's internal host), `DATABASE_USERNAME`,
-  `DATABASE_PASSWORD`, `COOKIE_SECURE=true`. Render sets `PORT`.
+  `DATABASE_PASSWORD`, `COOKIE_SECURE=true`, and `ANTHROPIC_API_KEY` for reading receipts. Render sets `PORT`.
 - **Deploys:** CI's last job calls the service's deploy hook after the build, tests, smoke test and
   Docker build all pass on `main`. The hook URL is the `RENDER_DEPLOY_HOOK_URL` repository secret
   (Render service > Settings > Deploy Hook). Without the secret the job just skips with a warning.

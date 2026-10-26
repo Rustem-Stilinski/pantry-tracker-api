@@ -33,7 +33,8 @@ class AnthropicReceiptReaderTests {
     private volatile int status;
     private volatile String reply;
     private volatile String requestBody;
-    private volatile String apiKeyHeader;
+    private volatile String authorizationHeader;
+    private volatile String workspaceHeader;
     private volatile String versionHeader;
     private AnthropicReceiptReader reader;
 
@@ -42,7 +43,8 @@ class AnthropicReceiptReaderTests {
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/v1/messages", exchange -> {
             requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
-            apiKeyHeader = exchange.getRequestHeaders().getFirst("x-api-key");
+            authorizationHeader = exchange.getRequestHeaders().getFirst("Authorization");
+            workspaceHeader = exchange.getRequestHeaders().getFirst("anthropic-workspace-id");
             versionHeader = exchange.getRequestHeaders().getFirst("anthropic-version");
             byte[] out = reply.getBytes(StandardCharsets.UTF_8);
             exchange.getResponseHeaders().add("Content-Type", "application/json");
@@ -52,8 +54,7 @@ class AnthropicReceiptReaderTests {
             }
         });
         server.start();
-        reader = new AnthropicReceiptReader("test-key", "claude-haiku-5-5",
-                "http://127.0.0.1:" + server.getAddress().getPort());
+        reader = new AnthropicReceiptReader("test-key", "", "claude-haiku-5-5", baseUrl());
     }
 
     @AfterEach
@@ -76,7 +77,8 @@ class AnthropicReceiptReaderTests {
         assertThat(draft.items().get(0).unitPrice()).isEqualByComparingTo(new BigDecimal("3.49"));
         assertThat(draft.total()).isEqualByComparingTo(new BigDecimal("3.70"));
 
-        assertThat(apiKeyHeader).isEqualTo("test-key");
+        assertThat(authorizationHeader).isEqualTo("Bearer test-key");
+        assertThat(workspaceHeader).isNull();
         assertThat(versionHeader).isEqualTo("2023-06-01");
         assertThat(requestBody)
                 .contains("\"model\":\"claude-haiku-5-5\"")
@@ -120,8 +122,33 @@ class AnthropicReceiptReaderTests {
 
     @Test
     void isOffWithoutAKey() {
-        assertThat(new AnthropicReceiptReader(" ", "claude-haiku-5-5", "http://127.0.0.1:1").isConfigured()).isFalse();
+        assertThat(new AnthropicReceiptReader(" ", "", "claude-haiku-5-5", "http://127.0.0.1:1").isConfigured()).isFalse();
         assertThat(reader.isConfigured()).isTrue();
+    }
+
+    @Test
+    void sendsTheWorkspaceWhenConfigured() {
+        status = 200;
+        reply = message("end_turn", DRAFT_JSON);
+        new AnthropicReceiptReader("test-key", "wrkspc_123", "claude-haiku-5-5", baseUrl()).read(
+                List.of(new Photo(new byte[] {1}, "image/png")), List.of(), List.of());
+        assertThat(workspaceHeader).isEqualTo("wrkspc_123");
+    }
+
+    @Test
+    void unscopedKeyWithoutWorkspaceExplainsTheFix() {
+        status = 400;
+        reply = "{\"type\":\"error\",\"error\":{\"type\":\"invalid_request_error\",\"message\":"
+                + "\"This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header\"}}";
+        assertThatThrownBy(this::readOnePhoto)
+                .isInstanceOfSatisfying(ResponseStatusException.class, ex -> {
+                    assertThat(ex.getStatusCode().value()).isEqualTo(503);
+                    assertThat(ex.getReason()).contains("ANTHROPIC_WORKSPACE_ID");
+                });
+    }
+
+    private String baseUrl() {
+        return "http://127.0.0.1:" + server.getAddress().getPort();
     }
 
     private ReceiptDraft readOnePhoto() {
