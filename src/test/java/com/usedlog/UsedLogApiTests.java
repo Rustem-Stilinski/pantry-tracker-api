@@ -1,8 +1,8 @@
 package com.usedlog;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasSize;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -13,8 +13,12 @@ import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.UUID;
 
+import jakarta.servlet.http.Cookie;
+
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -24,6 +28,7 @@ import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 import com.jayway.jsonpath.JsonPath;
 
@@ -37,6 +42,17 @@ class UsedLogApiTests {
 
     @Autowired
     MockMvc mvc;
+
+    /** The CSRF token, obtained the way the browser gets it: from the XSRF-TOKEN cookie. */
+    private String xsrfToken;
+
+    @BeforeEach
+    void fetchCsrfToken() throws Exception {
+        MvcResult result = mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized()).andReturn();
+        Cookie cookie = result.getResponse().getCookie("XSRF-TOKEN");
+        assertThat(cookie).as("XSRF-TOKEN cookie on the first response").isNotNull();
+        xsrfToken = cookie.getValue();
+    }
 
     // ---------- auth ----------
 
@@ -59,7 +75,7 @@ class UsedLogApiTests {
         String email = uniqueEmail();
         register(email, "Alex");
 
-        mvc.perform(post("/api/auth/login").with(csrf().asHeader())
+        mvc.perform(post("/api/auth/login").with(xsrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email": "%s", "password": "wrong-password"}
@@ -67,7 +83,7 @@ class UsedLogApiTests {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value("Email or password is incorrect."));
 
-        MvcResult ok = mvc.perform(post("/api/auth/login").with(csrf().asHeader())
+        MvcResult ok = mvc.perform(post("/api/auth/login").with(xsrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email": "%s", "password": "%s"}
@@ -86,7 +102,7 @@ class UsedLogApiTests {
     void duplicateEmailIsAConflict() throws Exception {
         String email = uniqueEmail();
         register(email, "Alex");
-        mvc.perform(post("/api/auth/register").with(csrf().asHeader())
+        mvc.perform(post("/api/auth/register").with(xsrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody(email, "Alex again")))
                 .andExpect(status().isConflict());
@@ -130,7 +146,7 @@ class UsedLogApiTests {
                 .andExpect(jsonPath("$[0].timesUsed").value(2));
 
         mvc.perform(delete("/api/households/{id}/entries/{entryId}", householdId, milkId)
-                        .session(alex).with(csrf().asHeader()))
+                        .session(alex).with(xsrf()))
                 .andExpect(status().isNoContent());
 
         mvc.perform(get("/api/households/{id}/entries", householdId).session(alex)
@@ -149,7 +165,7 @@ class UsedLogApiTests {
         // Codes are accepted the way people paste them: lower case, with a dash.
         String pasted = (code.substring(0, 4) + "-" + code.substring(4)).toLowerCase();
         MockHttpSession sam = register(uniqueEmail(), "Sam");
-        mvc.perform(post("/api/households/join").session(sam).with(csrf().asHeader())
+        mvc.perform(post("/api/households/join").session(sam).with(xsrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"inviteCode": "%s"}
@@ -168,7 +184,7 @@ class UsedLogApiTests {
         mvc.perform(get("/api/households/{id}/entries", householdId).session(outsider)
                         .param("month", month).param("tz", "UTC"))
                 .andExpect(status().isNotFound());
-        mvc.perform(post("/api/households/{id}/entries", householdId).session(outsider).with(csrf().asHeader())
+        mvc.perform(post("/api/households/{id}/entries", householdId).session(outsider).with(xsrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(entryBody("Toner", "1", "box", "Office", null)))
                 .andExpect(status().isNotFound());
@@ -181,14 +197,14 @@ class UsedLogApiTests {
         MockHttpSession alex = register(uniqueEmail(), "Alex");
         String householdId = JsonPath.read(createHousehold(alex, "Home").getResponse().getContentAsString(), "$.id");
 
-        mvc.perform(post("/api/households/{id}/entries", householdId).session(alex).with(csrf().asHeader())
+        mvc.perform(post("/api/households/{id}/entries", householdId).session(alex).with(xsrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(entryBody("Milk", "0", "carton", "Pantry", null)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail", containsString("quantity")));
 
         String tomorrow = Instant.now().plus(1, ChronoUnit.DAYS).toString();
-        mvc.perform(post("/api/households/{id}/entries", householdId).session(alex).with(csrf().asHeader())
+        mvc.perform(post("/api/households/{id}/entries", householdId).session(alex).with(xsrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(entryBody("Milk", "1", "carton", "Pantry", tomorrow)))
                 .andExpect(status().isBadRequest())
@@ -224,8 +240,20 @@ class UsedLogApiTests {
 
     // ---------- helpers ----------
 
+    /** Sends the CSRF token like Angular does: the XSRF-TOKEN cookie plus the same value in X-XSRF-TOKEN. */
+    private RequestPostProcessor xsrf() {
+        return request -> {
+            Cookie[] existing = request.getCookies();
+            Cookie[] cookies = existing == null ? new Cookie[1] : Arrays.copyOf(existing, existing.length + 1);
+            cookies[cookies.length - 1] = new Cookie("XSRF-TOKEN", xsrfToken);
+            request.setCookies(cookies);
+            request.addHeader("X-XSRF-TOKEN", xsrfToken);
+            return request;
+        };
+    }
+
     private MockHttpSession register(String email, String displayName) throws Exception {
-        MvcResult result = mvc.perform(post("/api/auth/register").with(csrf().asHeader())
+        MvcResult result = mvc.perform(post("/api/auth/register").with(xsrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(registerBody(email, displayName)))
                 .andExpect(status().isCreated())
@@ -235,7 +263,7 @@ class UsedLogApiTests {
     }
 
     private MvcResult createHousehold(MockHttpSession session, String name) throws Exception {
-        return mvc.perform(post("/api/households").session(session).with(csrf().asHeader())
+        return mvc.perform(post("/api/households").session(session).with(xsrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "%s"}
@@ -247,7 +275,7 @@ class UsedLogApiTests {
 
     private MvcResult addEntry(MockHttpSession session, String householdId, String item, String qty,
                                String unit, String category, String usedAt) throws Exception {
-        return mvc.perform(post("/api/households/{id}/entries", householdId).session(session).with(csrf().asHeader())
+        return mvc.perform(post("/api/households/{id}/entries", householdId).session(session).with(xsrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(entryBody(item, qty, unit, category, usedAt)))
                 .andExpect(status().isCreated())
