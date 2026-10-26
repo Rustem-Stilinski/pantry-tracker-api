@@ -26,7 +26,12 @@ jobs:
           cache: maven
 
       - name: Build and run tests (H2)
-        run: mvn -B -ntp verify
+        shell: bash
+        run: mvn -B -ntp verify 2>&1 | tee build.log
+
+      - name: Show build errors
+        if: failure()
+        run: ./ci/annotate-errors.sh build.log "Build or tests failed"
 
       - name: Upload test reports
         if: failure()
@@ -64,7 +69,8 @@ jobs:
           cache: maven
 
       - name: Package
-        run: mvn -B -ntp -DskipTests package
+        shell: bash
+        run: mvn -B -ntp -DskipTests package 2>&1 | tee build.log
 
       - name: Start the API
         run: |
@@ -78,9 +84,16 @@ jobs:
       - name: Run the smoke test
         run: ./ci/smoke-test.sh
 
+      - name: Show API errors
+        if: failure()
+        run: |
+          [ -f build.log ] && ./ci/annotate-errors.sh build.log "Package failed"
+          [ -f app.log ] && ./ci/annotate-errors.sh app.log "API errors during smoke test"
+          true
+
       - name: API log
         if: always()
-        run: cat app.log
+        run: cat app.log || true
 
   docker:
     name: Docker image
