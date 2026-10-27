@@ -199,7 +199,9 @@ class PriceApiTests {
         mvc.perform(get("/api/households/{id}/receipts/aliases", hid).session(alex))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[?(@.name == 'Milk 2%, 1 gal')].receiptText").value("gv 2%  mlk gal"))
+                // (jsonPath expressions are format strings, so match on category rather than a name with "%")
+                .andExpect(jsonPath("$[?(@.category == 'Dairy & eggs')].name").value("Milk 2%, 1 gal"))
+                .andExpect(jsonPath("$[?(@.category == 'Dairy & eggs')].receiptText").value("gv 2%  mlk gal"))
                 .andExpect(jsonPath("$[?(@.name == 'Bananas')].category").value("Produce"));
 
         MockHttpSession pat = register("Pat");
