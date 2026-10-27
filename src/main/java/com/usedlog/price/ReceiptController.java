@@ -21,6 +21,8 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.usedlog.common.MonthRange;
+import com.usedlog.price.PriceDtos.ReaderStatus;
+import com.usedlog.price.PriceDtos.ReceiptAlias;
 import com.usedlog.price.PriceDtos.ReceiptDetail;
 import com.usedlog.price.PriceDtos.ReceiptSummary;
 import com.usedlog.price.PriceDtos.SaveReceiptRequest;
@@ -39,6 +41,18 @@ public class ReceiptController {
 
     public ReceiptController(ReceiptService receipts) {
         this.receipts = receipts;
+    }
+
+    /** Whether photos can be read on the server (Claude); otherwise the app reads them on the device. */
+    @GetMapping("/reader")
+    public ReaderStatus reader(@AuthenticationPrincipal AppUserPrincipal me, @PathVariable UUID householdId) {
+        return receipts.readerStatus(householdId, me.getId());
+    }
+
+    /** Learned names: what each printed receipt line was last saved as. */
+    @GetMapping("/aliases")
+    public List<ReceiptAlias> aliases(@AuthenticationPrincipal AppUserPrincipal me, @PathVariable UUID householdId) {
+        return receipts.aliases(householdId, me.getId());
     }
 
     /** Multipart form with one to four parts named "photos", top of the receipt first. */

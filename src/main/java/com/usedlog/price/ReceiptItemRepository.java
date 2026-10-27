@@ -17,6 +17,9 @@ public interface ReceiptItemRepository extends JpaRepository<ReceiptItem, UUID> 
     List<ReceiptItem> findByHouseholdIdAndPurchasedAtGreaterThanEqualOrderByPurchasedAtAscLineNoAsc(
             UUID householdId, Instant since);
 
+    /** Lines that carry the printed receipt text, newest first: the source of learned names. */
+    List<ReceiptItem> findTop2000ByHouseholdIdAndReceiptTextIsNotNullOrderByPurchasedAtDesc(UUID householdId);
+
     /** One item's full history, oldest first. */
     List<ReceiptItem> findByHouseholdIdAndItemKeyOrderByPurchasedAtAscLineNoAsc(UUID householdId, String itemKey);
 }

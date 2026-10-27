@@ -180,6 +180,46 @@ class PriceApiTests {
     }
 
     @Test
+    void readerStatusAndLearnedNames() throws Exception {
+        MockHttpSession alex = register("Alex");
+        String hid = createHousehold(alex);
+
+        mvc.perform(get("/api/households/{id}/receipts/reader", hid).session(alex))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.claude").value(false));
+        when(reader.isConfigured()).thenReturn(true);
+        mvc.perform(get("/api/households/{id}/receipts/reader", hid).session(alex))
+                .andExpect(jsonPath("$.claude").value(true));
+
+        // The same printed line saved twice: the newer name wins, matched regardless of case and spacing.
+        saveLine(alex, hid, "2026-01-05T12:00:00Z", "GV 2% MLK GAL", "Milk", "Dairy & eggs");
+        saveLine(alex, hid, "2026-02-05T12:00:00Z", "gv 2%  mlk gal", "Milk 2%, 1 gal", "Dairy & eggs");
+        saveLine(alex, hid, "2026-02-05T12:00:00Z", "BANANAS", "Bananas", "Produce");
+
+        mvc.perform(get("/api/households/{id}/receipts/aliases", hid).session(alex))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[?(@.name == 'Milk 2%, 1 gal')].receiptText").value("gv 2%  mlk gal"))
+                .andExpect(jsonPath("$[?(@.name == 'Bananas')].category").value("Produce"));
+
+        MockHttpSession pat = register("Pat");
+        mvc.perform(get("/api/households/{id}/receipts/aliases", hid).session(pat)).andExpect(status().isNotFound());
+    }
+
+    private void saveLine(MockHttpSession session, String hid, String at, String receiptText, String name,
+                          String category) throws Exception {
+        mvc.perform(post("/api/households/{id}/receipts", hid).session(session).with(xsrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"storeName": "Giant", "purchasedAt": "%s", "items": [
+                                  {"name": "%s", "receiptText": "%s", "quantity": 1, "unit": "pcs",
+                                   "unitPrice": 3.98, "lineTotal": 3.98, "category": "%s"}
+                                ]}
+                                """.formatted(at, name, receiptText, category)))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
     void readingPhotosNeedsAnApiKey() throws Exception {
         MockHttpSession alex = register("Alex");
         String hid = createHousehold(alex);

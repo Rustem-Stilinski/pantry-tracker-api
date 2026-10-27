@@ -55,6 +55,14 @@ public final class PriceDtos {
                                 List<PriceChange> priceChanges) {
     }
 
+    /** Which reader the server offers. {@code claude} is false when no API key is set. */
+    public record ReaderStatus(boolean claude) {
+    }
+
+    /** "GV 2% MLK GAL" was last saved as "Milk 2%, 1 gal" (pcs, Dairy & eggs). */
+    public record ReceiptAlias(String receiptText, String name, String unit, String category) {
+    }
+
     // ---------- prices ----------
 
     /** "Eggs, 12 ct went from $2.79 at Aldi to $3.49 at Giant (+25.1%)". */

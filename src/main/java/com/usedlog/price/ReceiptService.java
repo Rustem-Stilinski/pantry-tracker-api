@@ -24,6 +24,8 @@ import com.usedlog.common.MonthRange;
 import com.usedlog.common.Text;
 import com.usedlog.household.HouseholdService;
 import com.usedlog.price.PriceDtos.ItemRequest;
+import com.usedlog.price.PriceDtos.ReaderStatus;
+import com.usedlog.price.PriceDtos.ReceiptAlias;
 import com.usedlog.price.PriceDtos.ReceiptDetail;
 import com.usedlog.price.PriceDtos.ReceiptLine;
 import com.usedlog.price.PriceDtos.ReceiptSummary;
@@ -71,6 +73,28 @@ public class ReceiptService {
         }
         List<Photo> photos = validPhotos(files);
         return reader.read(photos, knownItemNames(householdId), prices.storeNames(householdId));
+    }
+
+    @Transactional(readOnly = true)
+    public ReaderStatus readerStatus(UUID householdId, UUID userId) {
+        households.requireMember(householdId, userId);
+        return new ReaderStatus(reader.isConfigured());
+    }
+
+    /**
+     * The name, unit and category each printed receipt line was last saved with. A reader that
+     * can't expand abbreviations (on-device text recognition) uses these so a fix is made once.
+     */
+    @Transactional(readOnly = true)
+    public List<ReceiptAlias> aliases(UUID householdId, UUID userId) {
+        households.requireMember(householdId, userId);
+        Map<String, ReceiptAlias> latest = new LinkedHashMap<>();
+        for (ReceiptItem line : items.findTop2000ByHouseholdIdAndReceiptTextIsNotNullOrderByPurchasedAtDesc(householdId)) {
+            String key = line.getReceiptText().trim().replaceAll("\\s+", " ").toUpperCase(java.util.Locale.ROOT);
+            latest.putIfAbsent(key, new ReceiptAlias(line.getReceiptText(), line.getItemName(), line.getUnit(),
+                    line.getCategory()));
+        }
+        return new ArrayList<>(latest.values());
     }
 
     @Transactional
