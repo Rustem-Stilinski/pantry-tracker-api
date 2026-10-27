@@ -114,7 +114,8 @@ public class ReceiptService {
                 ? money(request.total())
                 : linesTotal.add(tax == null ? BigDecimal.ZERO : tax);
 
-        Receipt receipt = receipts.save(new Receipt(householdId, store.getId(), request.purchasedAt(),
+        Receipt receipt = receipts.save(new Receipt(householdId, store.getId(),
+                Text.cleanOrNull(request.storeLocation()), request.purchasedAt(),
                 money(request.subtotal()), tax, total, userId, now));
 
         List<ReceiptItem> lines = new ArrayList<>();
@@ -145,7 +146,8 @@ public class ReceiptService {
                 .collect(Collectors.groupingBy(ReceiptItem::getReceiptId, Collectors.counting()));
         Map<UUID, String> storeNames = prices.storeNamesById(householdId);
         return found.stream()
-                .map(r -> new ReceiptSummary(r.getId(), storeNames.getOrDefault(r.getStoreId(), ""), r.getPurchasedAt(),
+                .map(r -> new ReceiptSummary(r.getId(), storeNames.getOrDefault(r.getStoreId(), ""),
+                        r.getStoreLocation(), r.getPurchasedAt(),
                         r.getTotal(), counts.getOrDefault(r.getId(), 0L).intValue()))
                 .toList();
     }
@@ -173,7 +175,8 @@ public class ReceiptService {
                 .map(line -> new ReceiptLine(line.getId(), line.getItemName(), line.getReceiptText(), line.getQuantity(),
                         line.getUnit(), line.getUnitPrice(), line.getLineTotal(), line.getCategory()))
                 .toList();
-        return new ReceiptDetail(receipt.getId(), storeName, receipt.getPurchasedAt(), receipt.getSubtotal(),
+        return new ReceiptDetail(receipt.getId(), storeName, receipt.getStoreLocation(), receipt.getPurchasedAt(),
+                receipt.getSubtotal(),
                 receipt.getTax(), receipt.getTotal(), receipt.getCreatedBy(), lineResponses,
                 prices.changesSince(receipt, lines));
     }

@@ -78,7 +78,7 @@ check "removed an entry"
 # ---- Prices: two receipts from different stores, then prices, comparison and spending.
 receipt() { # store, minutes ago, egg price
   local at; at=$(date -u -d "-$2 minutes" +%Y-%m-%dT%H:%M:%SZ)
-  call POST "/api/households/$hid/receipts" "{\"storeName\":\"$1\",\"purchasedAt\":\"$at\",\"tax\":0.10,\"items\":[
+  call POST "/api/households/$hid/receipts" "{\"storeName\":\"$1\",\"storeLocation\":\"1 Main St, Arlington, VA 22201\",\"purchasedAt\":\"$at\",\"tax\":0.10,\"items\":[
     {\"name\":\"Eggs, 12 ct\",\"receiptText\":\"LG EGGS 12CT\",\"quantity\":1,\"unit\":\"pcs\",\"unitPrice\":$3,\"lineTotal\":$3,\"category\":\"Dairy & eggs\"},
     {\"name\":\"Bananas\",\"quantity\":2,\"unit\":\"lb\",\"unitPrice\":0.59,\"lineTotal\":1.18,\"category\":\"Produce\"}]}"
 }
@@ -91,8 +91,9 @@ call GET "/api/households/$hid/prices" \
   | jq -e '(.items | length) == 2 and (.changes | length) == 1 and (.items[] | select(.itemName == "Eggs, 12 ct") | .lowestStore == "Aldi")' > /dev/null
 check "price list with latest, lowest and changes"
 
-call GET "/api/households/$hid/prices/history?item=Eggs%2C%2012%20ct" | jq -e '(.points | length) == 2' > /dev/null
-check "item price history"
+call GET "/api/households/$hid/prices/history?item=Eggs%2C%2012%20ct" \
+  | jq -e '(.points | length) == 2 and .points[0].storeLocation == "1 Main St, Arlington, VA 22201"' > /dev/null
+check "item price history, with each store's location"
 
 call GET "/api/households/$hid/prices/compare" | jq -e '.[0].stores[0].storeName == "Aldi"' > /dev/null
 check "store comparison puts the cheaper store first"

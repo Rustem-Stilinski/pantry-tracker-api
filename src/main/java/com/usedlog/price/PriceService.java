@@ -10,6 +10,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -132,10 +133,13 @@ public class PriceService {
         }
 
         Map<UUID, String> storeNames = storeNamesById(householdId);
+        Map<UUID, String> locations = new HashMap<>();
+        receipts.findAllById(lines.stream().map(ReceiptItem::getReceiptId).distinct().toList())
+                .forEach(r -> locations.put(r.getId(), r.getStoreLocation()));
         List<PricePoint> points = lines.stream()
                 .map(line -> new PricePoint(line.getReceiptId(), line.getPurchasedAt(),
-                        storeNames.getOrDefault(line.getStoreId(), ""), line.getQuantity(), line.getUnitPrice(),
-                        line.getLineTotal()))
+                        storeNames.getOrDefault(line.getStoreId(), ""), locations.get(line.getReceiptId()),
+                        line.getQuantity(), line.getUnitPrice(), line.getLineTotal()))
                 .toList();
         return new ItemHistory(summarize(lines, storeNames), storePrices(lines, storeNames), points);
     }

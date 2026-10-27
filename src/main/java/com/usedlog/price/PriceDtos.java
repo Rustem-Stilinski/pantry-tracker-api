@@ -20,9 +20,13 @@ public final class PriceDtos {
 
     // ---------- saving a receipt ----------
 
-    /** {@code total} is optional; when missing it's the sum of the lines plus tax. */
+    /**
+     * {@code total} is optional; when missing it's the sum of the lines plus tax. {@code storeLocation} is the
+     * branch as printed ("11620 Monument Dr, Fairfax, VA 22030"), optional.
+     */
     public record SaveReceiptRequest(
             @NotBlank @Size(max = 80) String storeName,
+            @Size(max = 160) String storeLocation,
             @NotNull Instant purchasedAt,
             @DecimalMin("0") BigDecimal subtotal,
             @DecimalMin("0") BigDecimal tax,
@@ -42,7 +46,8 @@ public final class PriceDtos {
 
     // ---------- receipts ----------
 
-    public record ReceiptSummary(UUID id, String storeName, Instant purchasedAt, BigDecimal total, int itemCount) {
+    public record ReceiptSummary(UUID id, String storeName, String storeLocation, Instant purchasedAt, BigDecimal total,
+                                 int itemCount) {
     }
 
     public record ReceiptLine(UUID id, String name, String receiptText, BigDecimal quantity, String unit,
@@ -50,7 +55,8 @@ public final class PriceDtos {
     }
 
     /** {@code priceChanges}: lines whose price moved 10% or more since the previous time they were bought. */
-    public record ReceiptDetail(UUID id, String storeName, Instant purchasedAt, BigDecimal subtotal, BigDecimal tax,
+    public record ReceiptDetail(UUID id, String storeName, String storeLocation, Instant purchasedAt,
+                                BigDecimal subtotal, BigDecimal tax,
                                 BigDecimal total, UUID createdBy, List<ReceiptLine> items,
                                 List<PriceChange> priceChanges) {
     }
@@ -82,7 +88,8 @@ public final class PriceDtos {
     public record PricesOverview(List<PriceChange> changes, List<ItemPrice> items) {
     }
 
-    public record PricePoint(UUID receiptId, Instant purchasedAt, String storeName, BigDecimal quantity,
+    public record PricePoint(UUID receiptId, Instant purchasedAt, String storeName, String storeLocation,
+                             BigDecimal quantity,
                              BigDecimal unitPrice, BigDecimal lineTotal) {
     }
 

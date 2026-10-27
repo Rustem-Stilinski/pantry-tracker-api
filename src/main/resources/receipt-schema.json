@@ -5,6 +5,10 @@
       "anyOf": [{ "type": "string" }, { "type": "null" }],
       "description": "The store's everyday name, e.g. Giant or Trader Joe's."
     },
+    "storeLocation": {
+      "anyOf": [{ "type": "string" }, { "type": "null" }],
+      "description": "The branch's address as printed under the store name, e.g. 11620 Monument Dr, Fairfax, VA 22030."
+    },
     "purchaseDate": {
       "anyOf": [{ "type": "string", "format": "date" }, { "type": "null" }],
       "description": "Purchase date as printed, YYYY-MM-DD."
@@ -48,6 +52,6 @@
       "description": "One short sentence on anything to double-check; null when everything is clear."
     }
   },
-  "required": ["storeName", "purchaseDate", "purchaseTime", "currency", "items", "subtotal", "tax", "total", "notes"],
+  "required": ["storeName", "storeLocation", "purchaseDate", "purchaseTime", "currency", "items", "subtotal", "tax", "total", "notes"],
   "additionalProperties": false
 }
