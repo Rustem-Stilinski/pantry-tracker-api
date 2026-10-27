@@ -26,6 +26,10 @@ public class Receipt {
     @Column(name = "store_id", nullable = false)
     private UUID storeId;
 
+    /** The branch, as printed under the store's name; null when unknown. */
+    @Column(name = "store_location", length = 160)
+    private String storeLocation;
+
     @Column(name = "purchased_at", nullable = false)
     private Instant purchasedAt;
 
@@ -47,10 +51,11 @@ public class Receipt {
     protected Receipt() {
     }
 
-    public Receipt(UUID householdId, UUID storeId, Instant purchasedAt, BigDecimal subtotal, BigDecimal tax,
-                   BigDecimal total, UUID createdBy, Instant createdAt) {
+    public Receipt(UUID householdId, UUID storeId, String storeLocation, Instant purchasedAt, BigDecimal subtotal,
+                   BigDecimal tax, BigDecimal total, UUID createdBy, Instant createdAt) {
         this.householdId = householdId;
         this.storeId = storeId;
+        this.storeLocation = storeLocation;
         this.purchasedAt = purchasedAt;
         this.subtotal = subtotal;
         this.tax = tax;
@@ -69,6 +74,10 @@ public class Receipt {
 
     public UUID getStoreId() {
         return storeId;
+    }
+
+    public String getStoreLocation() {
+        return storeLocation;
     }
 
     public Instant getPurchasedAt() {

@@ -23,7 +23,7 @@ import com.usedlog.price.ReceiptReader.ReceiptDraft;
 class AnthropicReceiptReaderTests {
 
     private static final String DRAFT_JSON = """
-            {"storeName":"Giant","purchaseDate":"2026-10-20","purchaseTime":"14:05","currency":"USD",
+            {"storeName":"Giant","storeLocation":"4500 Lee Hwy, Arlington, VA 22207","purchaseDate":"2026-10-20","purchaseTime":"14:05","currency":"USD",
              "items":[{"receiptText":"GNT LG EGGS 12CT","name":"Eggs, large, 12 ct","quantity":1,"unit":"pcs",
                        "unitPrice":3.49,"lineTotal":3.49,"category":"Dairy & eggs"}],
              "subtotal":3.49,"tax":0.21,"total":3.70,"notes":null}
@@ -72,6 +72,7 @@ class AnthropicReceiptReaderTests {
                 List.of("Milk 2%, 1 gal"), List.of("Giant"));
 
         assertThat(draft.storeName()).isEqualTo("Giant");
+        assertThat(draft.storeLocation()).isEqualTo("4500 Lee Hwy, Arlington, VA 22207");
         assertThat(draft.items()).hasSize(1);
         assertThat(draft.items().get(0).name()).isEqualTo("Eggs, large, 12 ct");
         assertThat(draft.items().get(0).unitPrice()).isEqualByComparingTo(new BigDecimal("3.49"));

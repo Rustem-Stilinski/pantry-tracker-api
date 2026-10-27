@@ -75,7 +75,8 @@ class PriceApiTests {
         mvc.perform(post("/api/households/{id}/receipts", hid).session(alex).with(xsrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
-                                {"storeName": "Aldi", "purchasedAt": "%s", "tax": 0.20, "items": [
+                                {"storeName": "Aldi", "storeLocation": " 1200  Main St, Arlington, VA 22201 ",
+                                 "purchasedAt": "%s", "tax": 0.20, "items": [
                                   {"name": "Eggs, 12 ct", "receiptText": "LG EGGS 12CT", "quantity": 1, "unit": "pcs",
                                    "unitPrice": 2.79, "lineTotal": 2.79, "category": "Dairy & eggs"},
                                   {"name": "Bananas", "quantity": 2.0, "unit": "lb", "unitPrice": 0.59, "lineTotal": 1.18,
@@ -84,6 +85,7 @@ class PriceApiTests {
                                 """.formatted(tenDaysAgo)))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.storeName").value("Aldi"))
+                .andExpect(jsonPath("$.storeLocation").value("1200 Main St, Arlington, VA 22201"))
                 .andExpect(jsonPath("$.total").value(4.17))
                 .andExpect(jsonPath("$.items", hasSize(2)))
                 .andExpect(jsonPath("$.items[0].receiptText").value("LG EGGS 12CT"))
@@ -101,6 +103,7 @@ class PriceApiTests {
                                 ]}
                                 """.formatted(twoDaysAgo)))
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.storeLocation").isEmpty())
                 .andExpect(jsonPath("$.total").value(6.0))
                 .andExpect(jsonPath("$.priceChanges", hasSize(1)))
                 .andExpect(jsonPath("$.priceChanges[0].previousPrice").value(2.79))
@@ -127,6 +130,8 @@ class PriceApiTests {
                 .andExpect(jsonPath("$.summary.unit").value("pcs"))
                 .andExpect(jsonPath("$.points", hasSize(2)))
                 .andExpect(jsonPath("$.points[0].storeName").value("Aldi"))
+                .andExpect(jsonPath("$.points[0].storeLocation").value("1200 Main St, Arlington, VA 22201"))
+                .andExpect(jsonPath("$.points[1].storeLocation").isEmpty())
                 .andExpect(jsonPath("$.stores[0].storeName").value("Aldi"))
                 .andExpect(jsonPath("$.stores[1].storeName").value("giant"));
 
@@ -237,7 +242,7 @@ class PriceApiTests {
         String hid = createHousehold(alex);
         when(reader.isConfigured()).thenReturn(true);
         when(reader.read(anyList(), anyList(), anyList())).thenReturn(new ReceiptDraft(
-                "Giant", "2026-10-20", "14:05", "USD",
+                "Giant", "4500 Lee Hwy, Arlington, VA 22207", "2026-10-20", "14:05", "USD",
                 List.of(new DraftItem("GNT LG EGGS 12CT", "Eggs, large, 12 ct", BigDecimal.ONE, "pcs",
                         new BigDecimal("3.49"), new BigDecimal("3.49"), "Dairy & eggs")),
                 new BigDecimal("3.49"), new BigDecimal("0.21"), new BigDecimal("3.70"), null));
@@ -247,6 +252,7 @@ class PriceApiTests {
                         .session(alex).with(xsrf()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.storeName").value("Giant"))
+                .andExpect(jsonPath("$.storeLocation").value("4500 Lee Hwy, Arlington, VA 22207"))
                 .andExpect(jsonPath("$.items[0].name").value("Eggs, large, 12 ct"))
                 .andExpect(jsonPath("$.total").value(3.7));
 

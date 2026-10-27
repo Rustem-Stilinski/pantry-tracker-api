@@ -27,7 +27,8 @@ public interface ReceiptReader {
 
     /** What was read off the receipt. Any field can be null when it wasn't printed or legible. */
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record ReceiptDraft(String storeName, String purchaseDate, String purchaseTime, String currency,
+    record ReceiptDraft(String storeName, String storeLocation, String purchaseDate, String purchaseTime,
+                        String currency,
                         List<DraftItem> items, BigDecimal subtotal, BigDecimal tax, BigDecimal total,
                         String notes) {
     }

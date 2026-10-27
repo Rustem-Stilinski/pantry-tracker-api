@@ -68,6 +68,8 @@ public class AnthropicReceiptReader implements ReceiptReader {
             - category: the closest one from the allowed list.
             - storeName: the store's everyday name, such as "Giant" or "Trader Joe's", not an address or a
               legal company name. If it matches one of the household's existing stores, use that exact name.
+            - storeLocation: the branch's address as printed under the name, on one line with normal
+              capitalization, such as "11620 Monument Dr, Fairfax, VA 22030"; null when none is printed.
             - purchaseDate (YYYY-MM-DD) and purchaseTime (24-hour HH:MM) as printed; null when missing.
             - subtotal, tax and total as printed; null when missing.
             - Numbers have no currency symbols. currency is the ISO code: USD unless the receipt shows another.
@@ -171,7 +173,8 @@ public class AnthropicReceiptReader implements ReceiptReader {
         try {
             ReceiptDraft draft = JSON.readValue(text, ReceiptDraft.class);
             return draft.items() == null
-                    ? new ReceiptDraft(draft.storeName(), draft.purchaseDate(), draft.purchaseTime(), draft.currency(),
+                    ? new ReceiptDraft(draft.storeName(), draft.storeLocation(), draft.purchaseDate(),
+                            draft.purchaseTime(), draft.currency(),
                             List.of(), draft.subtotal(), draft.tax(), draft.total(), draft.notes())
                     : draft;
         } catch (JacksonException ex) {
