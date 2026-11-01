@@ -46,3 +46,7 @@ app:
     workspace-id: ${ANTHROPIC_WORKSPACE_ID:}
     model: ${ANTHROPIC_MODEL:claude-haiku-5-5}
     api-url: ${ANTHROPIC_API_URL:https://api.anthropic.com}
+  barcodes:
+    # Suggests a name the first time a barcode is scanned (Open Food Facts: free, no key; only the
+    # barcode number is sent). Set PRODUCT_LOOKUP_URL to an empty value to turn suggestions off.
+    lookup-url: ${PRODUCT_LOOKUP_URL:https://world.openfoodfacts.org}

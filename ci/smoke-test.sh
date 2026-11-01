@@ -101,6 +101,18 @@ check "store comparison puts the cheaper store first"
 call GET "/api/households/$hid/spending?tz=UTC" | jq -e '.total >= 8.84 and (.months | length) == 12' > /dev/null
 check "monthly spending"
 
+# ---- Barcodes: name one after the receipt's item; scanning it then finds the item's prices.
+call PUT "/api/households/$hid/barcodes/036000291452?format=upc_a" '{"itemName":"eggs, 12 CT"}' \
+  | jq -e '.code == "0036000291452" and .known and .prices.latestStore == "Giant" and .prices.lowestStore == "Aldi"' > /dev/null
+check "named a barcode; it shows the item's receipt prices"
+
+call GET "/api/households/$hid/barcodes/0036000291452" | jq -e '.known and .itemName == "eggs, 12 CT"' > /dev/null
+check "scanning it again (as EAN-13) finds the same item"
+
+status=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$BASE/api/households/$hid/barcodes/036000291453")
+[[ "$status" == "400" ]] || { echo "expected 400 for a bad check digit, got $status"; exit 1; }
+check "a misread barcode is refused"
+
 # Reading photos: 503 without an API key (as in CI); with a key, a fake photo can't be read (4xx/5xx).
 printf 'not really a photo' > /tmp/smoke-receipt.jpg
 status=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X POST -H "X-XSRF-TOKEN: $(xsrf)" \
