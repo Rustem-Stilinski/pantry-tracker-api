@@ -38,6 +38,15 @@ class BarcodesTests {
     }
 
     @Test
+    void receiptsCanPrintAUpcWithoutItsEndDigits() {
+        // Safeway prints UPC 0 21130 50504 3 as "2113050504".
+        assertThat(Barcodes.receiptForms("0021130505043"))
+                .containsExactly("0021130505043", "002113050504", "021130505043", "02113050504", "2113050504");
+        assertThat(Barcodes.receiptForms("4006381333931")).containsExactly("4006381333931", "400638133393");
+        assertThat(Barcodes.receiptForms("96385074")).containsExactly("96385074", "9638507");
+    }
+
+    @Test
     void misreadsAndOtherTextAreRejected() {
         assertThat(Barcodes.normalize("036000291453", null)).isNull();   // wrong check digit
         assertThat(Barcodes.normalize("4006381333932", null)).isNull();

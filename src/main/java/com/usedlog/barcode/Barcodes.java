@@ -1,5 +1,7 @@
 package com.usedlog.barcode;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -59,6 +61,25 @@ public final class Barcodes {
                 return null;
             }
         }
+    }
+
+    /**
+     * The ways a receipt can print this barcode: in full, without its check digit, and for a UPC also
+     * without its first and last digit (Safeway prints UPC 0 21130 50504 3 as "2113050504").
+     *
+     * @param code a normalized barcode (see {@link #normalize})
+     */
+    public static List<String> receiptForms(String code) {
+        List<String> forms = new ArrayList<>();
+        forms.add(code);
+        forms.add(code.substring(0, code.length() - 1));
+        if (code.length() == 13 && code.charAt(0) == '0') {
+            String upcA = code.substring(1);
+            forms.add(upcA);
+            forms.add(upcA.substring(0, 11));
+            forms.add(upcA.substring(1, 11));
+        }
+        return forms.stream().distinct().toList();
     }
 
     /** GS1 check digit: weights 3, 1, 3... from the right, ignoring the check digit itself. */

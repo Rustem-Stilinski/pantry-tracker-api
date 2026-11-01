@@ -20,6 +20,13 @@ public interface ReceiptItemRepository extends JpaRepository<ReceiptItem, UUID> 
     /** Lines that carry the printed receipt text, newest first: the source of learned names. */
     List<ReceiptItem> findTop2000ByHouseholdIdAndReceiptTextIsNotNullOrderByPurchasedAtDesc(UUID householdId);
 
+    /** The latest line carrying one of these item codes: a scanned barcode's receipt line. */
+    java.util.Optional<ReceiptItem> findFirstByHouseholdIdAndItemCodeInOrderByPurchasedAtDesc(UUID householdId,
+                                                                                            Collection<String> itemCodes);
+
+    /** Lines that carry an item code, newest first: the codes printed on receipts. */
+    List<ReceiptItem> findByHouseholdIdAndItemCodeIsNotNullOrderByPurchasedAtDesc(UUID householdId);
+
     /** One item's full history, oldest first. */
     List<ReceiptItem> findByHouseholdIdAndItemKeyOrderByPurchasedAtAscLineNoAsc(UUID householdId, String itemKey);
 }

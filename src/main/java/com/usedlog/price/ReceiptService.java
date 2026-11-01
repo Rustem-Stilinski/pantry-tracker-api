@@ -127,7 +127,7 @@ public class ReceiptService {
                     name, Text.itemKey(name), Text.cleanOrNull(item.receiptText()),
                     item.quantity().setScale(3, RoundingMode.HALF_UP), Text.clean(item.unit()),
                     item.unitPrice().setScale(3, RoundingMode.HALF_UP), money(item.lineTotal()),
-                    Text.clean(item.category())));
+                    Text.clean(item.category()), Text.cleanOrNull(item.itemCode())));
         }
         items.saveAll(lines);
 
@@ -189,7 +189,8 @@ public class ReceiptService {
     private ReceiptDetail detail(Receipt receipt, String storeName, List<ReceiptItem> lines) {
         List<ReceiptLine> lineResponses = lines.stream()
                 .map(line -> new ReceiptLine(line.getId(), line.getItemName(), line.getReceiptText(), line.getQuantity(),
-                        line.getUnit(), line.getUnitPrice(), line.getLineTotal(), line.getCategory()))
+                        line.getUnit(), line.getUnitPrice(), line.getLineTotal(), line.getCategory(),
+                        line.getItemCode()))
                 .toList();
         return new ReceiptDetail(receipt.getId(), storeName, receipt.getStoreLocation(), receipt.getPurchasedAt(),
                 receipt.getSubtotal(),

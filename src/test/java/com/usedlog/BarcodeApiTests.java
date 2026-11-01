@@ -169,6 +169,66 @@ class BarcodeApiTests {
     }
 
     @Test
+    void aCodePrintedOnAReceiptLinksTheProductWhenItIsScanned() throws Exception {
+        MockHttpSession alex = register("Alex");
+        String hid = createHousehold(alex);
+        // Safeway prints each line's UPC without its first and last digit.
+        mvc.perform(post("/api/households/{id}/receipts", hid).session(alex).with(xsrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"storeName": "Safeway", "purchasedAt": "2026-10-31T20:00:00Z", "items": [
+                                  {"name": "Signature jasmine rice, 2 lb", "receiptText": "SIG JASMINE RICE 2LB",
+                                   "itemCode": "2113050504", "quantity": 1, "unit": "pcs", "unitPrice": 3.49,
+                                   "lineTotal": 3.49, "category": "Pantry"},
+                                  {"name": "Bananas", "quantity": 2, "unit": "lb", "unitPrice": 0.59, "lineTotal": 1.18,
+                                   "category": "Produce"}
+                                ]}
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.items[0].itemCode").value("2113050504"))
+                .andExpect(jsonPath("$.items[1].itemCode").isEmpty());
+
+        // Before any scan, the item shows the code from its receipt.
+        mvc.perform(get("/api/households/{id}/barcodes", hid).param("item", "Signature jasmine rice, 2 lb").session(alex))
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].code").value("2113050504"))
+                .andExpect(jsonPath("$[0].source").value("receipt"));
+
+        // Scanning the package (UPC-A 0 21130 50504 3) finds the line: linked, with prices, no naming.
+        mvc.perform(get("/api/households/{id}/barcodes/{code}", hid, "021130505043").param("format", "upc_a")
+                        .session(alex))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("0021130505043"))
+                .andExpect(jsonPath("$.known").value(true))
+                .andExpect(jsonPath("$.itemName").value("Signature jasmine rice, 2 lb"))
+                .andExpect(jsonPath("$.receiptCode").value("2113050504"))
+                .andExpect(jsonPath("$.prices.latestPrice").value(3.49))
+                .andExpect(jsonPath("$.prices.latestStore").value("Safeway"));
+        verify(productLookup, never()).find(anyString());
+
+        // Now it's a scanned barcode, listed once in full; scanning again doesn't need the receipt.
+        mvc.perform(get("/api/households/{id}/barcodes", hid).param("item", "Signature jasmine rice, 2 lb").session(alex))
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].code").value("0021130505043"))
+                .andExpect(jsonPath("$[0].source").value("scan"));
+        mvc.perform(get("/api/households/{id}/barcodes/{code}", hid, "0021130505043").session(alex))
+                .andExpect(jsonPath("$.known").value(true))
+                .andExpect(jsonPath("$.receiptCode").isEmpty());
+
+        // An item code has to be digits.
+        mvc.perform(post("/api/households/{id}/receipts", hid).session(alex).with(xsrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"storeName": "Safeway", "purchasedAt": "2026-10-31T20:00:00Z", "items": [
+                                  {"name": "Rice", "itemCode": "21130-ABC", "quantity": 1, "unit": "pcs",
+                                   "unitPrice": 3.49, "lineTotal": 3.49, "category": "Pantry"}
+                                ]}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail", containsString("itemCode")));
+    }
+
+    @Test
     void barcodesBelongToOneHousehold() throws Exception {
         MockHttpSession alex = register("Alex");
         String hid = createHousehold(alex);

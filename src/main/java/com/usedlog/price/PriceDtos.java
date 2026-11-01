@@ -10,6 +10,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 /** Request and response bodies for receipts, prices and spending. Prices are per unit (per lb, per each...). */
@@ -34,9 +35,11 @@ public final class PriceDtos {
             @NotEmpty @Size(max = 300) List<@Valid ItemRequest> items) {
     }
 
+    /** {@code itemCode}: the code printed on the line, digits only (Safeway prints the UPC without its end digits). */
     public record ItemRequest(
             @NotBlank @Size(max = 80) String name,
             @Size(max = 120) String receiptText,
+            @Pattern(regexp = "\\d{6,14}", message = "must be 6 to 14 digits") String itemCode,
             @NotNull @DecimalMin("0.001") BigDecimal quantity,
             @NotBlank @Size(max = 20) String unit,
             @NotNull @DecimalMin("0") BigDecimal unitPrice,
@@ -55,7 +58,7 @@ public final class PriceDtos {
     }
 
     public record ReceiptLine(UUID id, String name, String receiptText, BigDecimal quantity, String unit,
-                              BigDecimal unitPrice, BigDecimal lineTotal, String category) {
+                              BigDecimal unitPrice, BigDecimal lineTotal, String category, String itemCode) {
     }
 
     /** {@code priceChanges}: lines whose price moved 10% or more since the previous time they were bought. */

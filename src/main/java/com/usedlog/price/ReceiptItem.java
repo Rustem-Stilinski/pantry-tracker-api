@@ -64,12 +64,16 @@ public class ReceiptItem {
     @Column(nullable = false, length = 30)
     private String category;
 
+    /** The item code printed on the line (digits only), when the store prints one. */
+    @Column(name = "item_code", length = 14)
+    private String itemCode;
+
     protected ReceiptItem() {
     }
 
     public ReceiptItem(UUID receiptId, UUID householdId, UUID storeId, Instant purchasedAt, int lineNo,
                        String itemName, String itemKey, String receiptText, BigDecimal quantity, String unit,
-                       BigDecimal unitPrice, BigDecimal lineTotal, String category) {
+                       BigDecimal unitPrice, BigDecimal lineTotal, String category, String itemCode) {
         this.receiptId = receiptId;
         this.householdId = householdId;
         this.storeId = storeId;
@@ -83,6 +87,11 @@ public class ReceiptItem {
         this.unitPrice = unitPrice;
         this.lineTotal = lineTotal;
         this.category = category;
+        this.itemCode = itemCode;
+    }
+
+    public String getItemCode() {
+        return itemCode;
     }
 
     /** Keeps the copy of the receipt's date in step when the receipt's date is corrected. */
