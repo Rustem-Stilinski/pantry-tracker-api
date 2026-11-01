@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -224,6 +225,57 @@ class PriceApiTests {
                                 ]}
                                 """.formatted(at, name, receiptText, category)))
                 .andExpect(status().isCreated());
+    }
+
+    @Test
+    void aMisreadDateCanBeCorrected() throws Exception {
+        MockHttpSession alex = register("Alex");
+        String hid = createHousehold(alex);
+        // Read as March 31 (New York), really bought April 1.
+        MvcResult saved = mvc.perform(post("/api/households/{id}/receipts", hid).session(alex).with(xsrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(simpleReceipt("Wegmans", "2026-03-31T16:38:00Z", "5.49", null)))
+                .andExpect(status().isCreated())
+                .andReturn();
+        String rid = JsonPath.read(saved.getResponse().getContentAsString(), "$.id");
+
+        mvc.perform(patch("/api/households/{id}/receipts/{rid}", hid, rid).session(alex).with(xsrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purchasedAt\": \"2026-04-01T16:38:00Z\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.purchasedAt").value("2026-04-01T16:38:00Z"))
+                .andExpect(jsonPath("$.storeName").value("Wegmans"))
+                .andExpect(jsonPath("$.items", hasSize(1)));
+
+        // It moves to April in the list, and its lines follow in the item's price history.
+        mvc.perform(get("/api/households/{id}/receipts", hid).param("month", "2026-03").param("tz", "America/New_York")
+                        .session(alex))
+                .andExpect(jsonPath("$", hasSize(0)));
+        mvc.perform(get("/api/households/{id}/receipts", hid).param("month", "2026-04").param("tz", "America/New_York")
+                        .session(alex))
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].id").value(rid));
+        mvc.perform(get("/api/households/{id}/prices/history", hid).param("item", "Rice, 20 lb").session(alex))
+                .andExpect(jsonPath("$.points[0].purchasedAt").value("2026-04-01T16:38:00Z"));
+
+        // Not in the future, not empty, not without the CSRF header, not someone else's.
+        mvc.perform(patch("/api/households/{id}/receipts/{rid}", hid, rid).session(alex).with(xsrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purchasedAt\": \"2999-01-01T00:00:00Z\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch("/api/households/{id}/receipts/{rid}", hid, rid).session(alex).with(xsrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(patch("/api/households/{id}/receipts/{rid}", hid, rid).session(alex)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purchasedAt\": \"2026-04-02T16:38:00Z\"}"))
+                .andExpect(status().isForbidden());
+        MockHttpSession pat = register("Pat");
+        mvc.perform(patch("/api/households/{id}/receipts/{rid}", hid, rid).session(pat).with(xsrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"purchasedAt\": \"2026-04-02T16:38:00Z\"}"))
+                .andExpect(status().isNotFound());
     }
 
     @Test

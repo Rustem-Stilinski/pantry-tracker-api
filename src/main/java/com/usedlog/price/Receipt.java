@@ -64,6 +64,11 @@ public class Receipt {
         this.createdAt = createdAt;
     }
 
+    /** Moves the receipt to another date and time (the lines follow, see {@link ReceiptItem#changePurchasedAt}). */
+    public void changePurchasedAt(Instant purchasedAt) {
+        this.purchasedAt = purchasedAt;
+    }
+
     public UUID getId() {
         return id;
     }

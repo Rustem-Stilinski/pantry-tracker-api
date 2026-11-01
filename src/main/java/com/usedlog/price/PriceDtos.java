@@ -44,6 +44,10 @@ public final class PriceDtos {
             @NotBlank @Size(max = 30) String category) {
     }
 
+    /** Corrects a saved receipt's date and time, e.g. one read wrong from the photo. */
+    public record ChangeReceiptRequest(@NotNull Instant purchasedAt) {
+    }
+
     // ---------- receipts ----------
 
     public record ReceiptSummary(UUID id, String storeName, String storeLocation, Instant purchasedAt, BigDecimal total,

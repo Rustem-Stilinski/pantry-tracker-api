@@ -1,19 +1,24 @@
 package com.usedlog.barcode;
 
+import java.util.List;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.usedlog.barcode.BarcodeDtos.BarcodeLookup;
+import com.usedlog.barcode.BarcodeDtos.ItemBarcode;
 import com.usedlog.barcode.BarcodeDtos.SaveBarcodeRequest;
 import com.usedlog.security.AppUserPrincipal;
 
@@ -29,6 +34,14 @@ public class BarcodeController {
 
     public BarcodeController(BarcodeService barcodes) {
         this.barcodes = barcodes;
+    }
+
+    /** The UPCs linked to one item: /barcodes?item=Fairlife 2% milk */
+    @GetMapping
+    public List<ItemBarcode> forItem(@AuthenticationPrincipal AppUserPrincipal me,
+                                     @PathVariable UUID householdId,
+                                     @RequestParam String item) {
+        return barcodes.forItem(householdId, me.getId(), item);
     }
 
     /** What a scanned barcode is: the household's item with its prices, or a suggested name for a new one. */
@@ -48,5 +61,14 @@ public class BarcodeController {
                               @RequestParam(required = false) String format,
                               @Valid @RequestBody SaveBarcodeRequest body) {
         return barcodes.save(householdId, me.getId(), code, format, body.itemName());
+    }
+
+    /** Unlinks a barcode from its item. */
+    @DeleteMapping("/{code}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void unlink(@AuthenticationPrincipal AppUserPrincipal me,
+                       @PathVariable UUID householdId,
+                       @PathVariable String code) {
+        barcodes.unlink(householdId, me.getId(), code);
     }
 }

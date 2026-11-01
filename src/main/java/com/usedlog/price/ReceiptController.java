@@ -10,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.usedlog.common.MonthRange;
+import com.usedlog.price.PriceDtos.ChangeReceiptRequest;
 import com.usedlog.price.PriceDtos.ReaderStatus;
 import com.usedlog.price.PriceDtos.ReceiptAlias;
 import com.usedlog.price.PriceDtos.ReceiptDetail;
@@ -84,6 +86,15 @@ public class ReceiptController {
                              @PathVariable UUID householdId,
                              @PathVariable UUID receiptId) {
         return receipts.get(householdId, me.getId(), receiptId);
+    }
+
+    /** Corrects a receipt's date and time, e.g. {"purchasedAt": "2026-11-01T17:38:00Z"}. */
+    @PatchMapping("/{receiptId}")
+    public ReceiptDetail changeDate(@AuthenticationPrincipal AppUserPrincipal me,
+                                    @PathVariable UUID householdId,
+                                    @PathVariable UUID receiptId,
+                                    @Valid @RequestBody ChangeReceiptRequest body) {
+        return receipts.changeDate(householdId, me.getId(), receiptId, body);
     }
 
     @DeleteMapping("/{receiptId}")

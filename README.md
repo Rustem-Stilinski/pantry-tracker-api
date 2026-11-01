@@ -93,6 +93,7 @@ always in `detail`. Everything except register, login and health requires a sign
 | POST | `/api/households/{id}/receipts` | Save a checked receipt; returns price changes it revealed |
 | GET | `/api/households/{id}/receipts?month=2026-10&tz=…` | Receipts in a month |
 | GET / DELETE | `/api/households/{id}/receipts/{receiptId}` | One receipt with its lines |
+| PATCH | `/api/households/{id}/receipts/{receiptId}` | Correct its date and time, e.g. `{"purchasedAt": "2026-11-01T17:38:00Z"}` |
 | GET | `/api/households/{id}/prices` | Every item's latest, lowest and average price, plus changes of 10%+ in the last 60 days |
 | GET | `/api/households/{id}/prices/history?item=Eggs, 12 ct&unit=pcs` | One item's purchases over time and by store |
 | GET | `/api/households/{id}/prices/compare` | Items bought at 2+ stores, cheapest store first |
@@ -100,6 +101,8 @@ always in `detail`. Everything except register, login and health requires a sign
 | GET | `/api/households/{id}/stores` | Store names, for autocomplete |
 | GET | `/api/households/{id}/barcodes/{code}?format=upc_a` | A scanned barcode: its item and prices, or a suggested name if it's new |
 | PUT | `/api/households/{id}/barcodes/{code}` | Name (or rename) a barcode, e.g. `{"itemName": "Milk 2%, 1 gal"}` |
+| GET | `/api/households/{id}/barcodes?item=Milk 2%, 1 gal` | The UPCs linked to an item |
+| DELETE | `/api/households/{id}/barcodes/{code}` | Unlink a UPC from its item |
 | GET | `/actuator/health` | Health check |
 
 Example entry:
@@ -136,6 +139,11 @@ The web app reads a product's barcode with the phone camera and asks `GET /barco
 - **A new barcode** comes back with `known: false` and, when Open Food Facts has it, a `suggestion`
   ("Fairlife 2% Reduced Fat Milk, 52 fl oz"). The person picks a name, ideally the one the item has on
   receipts so the scan finds its prices, and `PUT /barcodes/{code}` saves it for everyone in the log.
+
+**How prices link to a UPC.** Receipts print product names, not UPCs, so every price is filed under
+the item's name (`item_key`: lower case, single spaces). A barcode stores the item name too, and its
+prices are the receipt lines with the same key. Linking a UPC from the item's own price page (the web
+app's **Scan its UPC**) uses that exact name, so they always match.
 
 Codes are stored in one form: a 12-digit UPC-A gets a leading zero (EAN-13), an 8-digit UPC-E is
 expanded, and a code whose check digit is wrong is refused with 400, so a misread never becomes an item.
