@@ -36,11 +36,11 @@ public class BarcodeController {
         this.barcodes = barcodes;
     }
 
-    /** The UPCs linked to one item: /barcodes?item=Fairlife 2% milk */
+    /** The UPCs linked to one item (/barcodes?item=Fairlife 2% milk), or every one in the log (/barcodes). */
     @GetMapping
     public List<ItemBarcode> forItem(@AuthenticationPrincipal AppUserPrincipal me,
                                      @PathVariable UUID householdId,
-                                     @RequestParam String item) {
+                                     @RequestParam(required = false) String item) {
         return barcodes.forItem(householdId, me.getId(), item);
     }
 

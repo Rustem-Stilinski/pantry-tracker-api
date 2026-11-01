@@ -11,4 +11,6 @@ public interface BarcodeItemRepository extends JpaRepository<BarcodeItem, UUID> 
     Optional<BarcodeItem> findByHouseholdIdAndCode(UUID householdId, String code);
 
     List<BarcodeItem> findByHouseholdIdAndItemKeyOrderByCreatedAtAsc(UUID householdId, String itemKey);
+
+    List<BarcodeItem> findByHouseholdIdOrderByItemKeyAscCreatedAtAsc(UUID householdId);
 }

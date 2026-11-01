@@ -84,6 +84,18 @@ jobs:
       - name: Run the smoke test
         run: ./ci/smoke-test.sh
 
+      - name: Sign-ins survive a restart
+        run: |
+          ./ci/session-restart.sh before
+          pkill -f 'used-items-log-.*\.jar'
+          sleep 2
+          java -jar target/used-items-log-*.jar >> app.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -fs http://localhost:8080/actuator/health > /dev/null; then break; fi
+            sleep 2
+          done
+          ./ci/session-restart.sh after
+
       - name: Show API errors
         if: failure()
         run: |

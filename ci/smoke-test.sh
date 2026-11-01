@@ -111,6 +111,8 @@ check "scanning it again (as EAN-13) finds the same item"
 
 call GET "/api/households/$hid/barcodes?item=Eggs%2C%2012%20ct" | jq -e 'length == 1 and .[0].code == "0036000291452"' > /dev/null
 check "an item lists its UPCs"
+call GET "/api/households/$hid/barcodes" | jq -e 'length == 1 and .[0].itemName == "eggs, 12 CT"' > /dev/null
+check "the log lists all its UPCs"
 
 status=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X DELETE -H "X-XSRF-TOKEN: $(xsrf)" \
   "$BASE/api/households/$hid/barcodes/0036000291452")
