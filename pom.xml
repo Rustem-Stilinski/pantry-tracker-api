@@ -43,6 +43,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+        <!-- Sign-ins live in PostgreSQL, so a restart (deploy, or the host waking from sleep) keeps people signed in -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-session-jdbc</artifactId>
+        </dependency>
 
         <!-- Database migrations (Boot 4 needs the Flyway starter for auto-configuration) -->
         <dependency>

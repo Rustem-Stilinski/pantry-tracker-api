@@ -141,6 +141,12 @@ class BarcodeApiTests {
                 .andExpect(jsonPath("$", hasSize(2)))
                 .andExpect(jsonPath("$[*].code", containsInAnyOrder(MILK_EAN_13, "4006381333931")));
 
+        // Without an item: every UPC in the log, by item.
+        mvc.perform(get("/api/households/{id}/barcodes", hid).session(alex))
+                .andExpect(jsonPath("$", hasSize(3)))
+                .andExpect(jsonPath("$[2].itemName").value("Oat milk"))
+                .andExpect(jsonPath("$[2].code").value("96385074"));
+
         // Unlinked by the code as scanned (UPC-A): the stored EAN-13 goes.
         mvc.perform(delete("/api/households/{id}/barcodes/{code}", hid, MILK_UPC_A).session(alex).with(xsrf()))
                 .andExpect(status().isNoContent());

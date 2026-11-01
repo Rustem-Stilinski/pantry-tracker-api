@@ -15,6 +15,10 @@ spring:
   mvc:
     problemdetails:
       enabled: true
+  session:
+    jdbc:
+      # Flyway creates the session tables (V5__sessions.sql).
+      initialize-schema: never
   servlet:
     multipart:
       # Up to 4 receipt photos per request (the web app shrinks them first).

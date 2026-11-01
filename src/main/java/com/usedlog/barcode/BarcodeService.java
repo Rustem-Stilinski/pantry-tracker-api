@@ -71,16 +71,17 @@ public class BarcodeService {
         return known(householdId, code, name);
     }
 
-    /** The barcodes linked to an item (matched like prices: by name, ignoring case and spacing), oldest first. */
+    /**
+     * The barcodes linked to an item (matched like prices: by name, ignoring case and spacing), oldest first;
+     * with no item, every barcode in the log, by item.
+     */
     @Transactional(readOnly = true)
     public List<ItemBarcode> forItem(UUID householdId, UUID userId, String item) {
         households.requireMember(householdId, userId);
-        if (item == null || item.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Say which item, e.g. ?item=Milk 2%, 1 gal.");
-        }
-        return barcodes.findByHouseholdIdAndItemKeyOrderByCreatedAtAsc(householdId, Text.itemKey(item)).stream()
-                .map(b -> new ItemBarcode(b.getCode(), b.getItemName()))
-                .toList();
+        List<BarcodeItem> found = item == null || item.isBlank()
+                ? barcodes.findByHouseholdIdOrderByItemKeyAscCreatedAtAsc(householdId)
+                : barcodes.findByHouseholdIdAndItemKeyOrderByCreatedAtAsc(householdId, Text.itemKey(item));
+        return found.stream().map(b -> new ItemBarcode(b.getCode(), b.getItemName())).toList();
     }
 
     /** Unlinks a barcode from its item; scanning it again asks for a name. */

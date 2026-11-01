@@ -23,7 +23,7 @@ src/main/java/com/usedlog/
 ├── barcode/    scanned barcodes: which item each one is, name suggestions from Open Food Facts
 ├── events/     Server-Sent Events broadcaster
 └── common/     error handling, text helpers
-src/main/resources/db/migration/   V1 (log), V2 (prices), V3 (store location), V4 (barcodes)
+src/main/resources/db/migration/   V1 (log), V2 (prices), V3 (store location), V4 (barcodes), V5 (sessions)
 src/main/resources/receipt-schema.json   the shape Claude must return for a receipt
 src/test/java/com/usedlog/UsedLogApiTests.java
 ```
@@ -101,7 +101,7 @@ always in `detail`. Everything except register, login and health requires a sign
 | GET | `/api/households/{id}/stores` | Store names, for autocomplete |
 | GET | `/api/households/{id}/barcodes/{code}?format=upc_a` | A scanned barcode: its item and prices, or a suggested name if it's new |
 | PUT | `/api/households/{id}/barcodes/{code}` | Name (or rename) a barcode, e.g. `{"itemName": "Milk 2%, 1 gal"}` |
-| GET | `/api/households/{id}/barcodes?item=Milk 2%, 1 gal` | The UPCs linked to an item |
+| GET | `/api/households/{id}/barcodes?item=Milk 2%, 1 gal` | The UPCs linked to an item; without `item`, every UPC in the log |
 | DELETE | `/api/households/{id}/barcodes/{code}` | Unlink a UPC from its item |
 | GET | `/actuator/health` | Health check |
 
@@ -155,7 +155,9 @@ expanded, and a code whose check digit is wrong is refused with 400, so a misrea
 
 ## How it works
 
-**Sign-in.** Sessions use an HttpOnly cookie. CSRF protection uses Spring Security's single-page-app
+**Sign-in.** Sessions use an HttpOnly cookie and are stored in PostgreSQL (Spring Session JDBC, tables from
+`V5__sessions.sql`), so a deploy or the host waking from sleep doesn't sign anyone out. CI checks this by
+restarting the API mid-test (`ci/session-restart.sh`). CSRF protection uses Spring Security's single-page-app
 setup: the server sets an `XSRF-TOKEN` cookie and the web app echoes it in the `X-XSRF-TOKEN` header
 on every POST and DELETE. Passwords are hashed with bcrypt. Because of the cookies, the web app and
 the API must be served from the same origin (a proxy in front of both, see Deploying).
