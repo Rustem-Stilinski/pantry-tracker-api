@@ -4,3 +4,8 @@ spring:
     url: jdbc:h2:mem:usedlog;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
     username: sa
     password: ""
+
+# No calls to Open Food Facts from tests; tests that need a suggestion replace ProductLookup.
+app:
+  barcodes:
+    lookup-url: ""

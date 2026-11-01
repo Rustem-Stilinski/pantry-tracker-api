@@ -4,8 +4,9 @@
 
 REST API for **Pantry Tracker**: a shared log of things that get used up (paper towels, coffee pods,
 printer paper) and of what they cost. Snap a receipt and the API reads the items and prices with
-Claude, then tracks price history, compares stores and totals spending. Several people share one log
-by joining it with an invite code.
+Claude, then tracks price history, compares stores and totals spending. Scan a product's barcode to
+see what it cost last time and where it's cheapest. Several people share one log by joining it with an
+invite code.
 
 The web app lives in [pantry-tracker-web](https://github.com/Rustem-Stilinski/pantry-tracker-web).
 
@@ -19,9 +20,10 @@ src/main/java/com/usedlog/
 ├── household/  shared logs and invite codes
 ├── entry/      entries, monthly totals, frequent items
 ├── price/      receipts, reading photos with Claude, prices, stores, spending
+├── barcode/    scanned barcodes: which item each one is, name suggestions from Open Food Facts
 ├── events/     Server-Sent Events broadcaster
 └── common/     error handling, text helpers
-src/main/resources/db/migration/   V1 (log), V2 (prices)
+src/main/resources/db/migration/   V1 (log), V2 (prices), V3 (store location), V4 (barcodes)
 src/main/resources/receipt-schema.json   the shape Claude must return for a receipt
 src/test/java/com/usedlog/UsedLogApiTests.java
 ```
@@ -96,6 +98,8 @@ always in `detail`. Everything except register, login and health requires a sign
 | GET | `/api/households/{id}/prices/compare` | Items bought at 2+ stores, cheapest store first |
 | GET | `/api/households/{id}/spending?year=2026&tz=…` | Spending per month, by store and category |
 | GET | `/api/households/{id}/stores` | Store names, for autocomplete |
+| GET | `/api/households/{id}/barcodes/{code}?format=upc_a` | A scanned barcode: its item and prices, or a suggested name if it's new |
+| PUT | `/api/households/{id}/barcodes/{code}` | Name (or rename) a barcode, e.g. `{"itemName": "Milk 2%, 1 gal"}` |
 | GET | `/actuator/health` | Health check |
 
 Example entry:
@@ -122,6 +126,24 @@ A receipt costs well under a cent.
 | `ANTHROPIC_API_KEY` | Turns reading on. Create one at [platform.claude.com/settings/keys](https://platform.claude.com/settings/keys); a key scoped to one workspace is simplest. Without it, the read endpoint answers 503 and the app offers manual entry. |
 | `ANTHROPIC_WORKSPACE_ID` | Only for a key that isn't scoped to a workspace. |
 | `ANTHROPIC_MODEL` | Optional; default `claude-haiku-5-5`. |
+
+## Scanning barcodes
+
+The web app reads a product's barcode with the phone camera and asks `GET /barcodes/{code}`:
+
+- **A barcode the household has named** comes back with the item's name and, when the item is on any
+  receipt, its latest, lowest and average price (`prices`, the same shape as an item on `/prices`).
+- **A new barcode** comes back with `known: false` and, when Open Food Facts has it, a `suggestion`
+  ("Fairlife 2% Reduced Fat Milk, 52 fl oz"). The person picks a name, ideally the one the item has on
+  receipts so the scan finds its prices, and `PUT /barcodes/{code}` saves it for everyone in the log.
+
+Codes are stored in one form: a 12-digit UPC-A gets a leading zero (EAN-13), an 8-digit UPC-E is
+expanded, and a code whose check digit is wrong is refused with 400, so a misread never becomes an item.
+`format` (the scanner's name for the symbology) only matters for 8-digit codes, which can be EAN-8 or UPC-E.
+
+| Variable | |
+|---|---|
+| `PRODUCT_LOOKUP_URL` | Optional; default `https://world.openfoodfacts.org` (free, no key). Only the barcode number is sent; answers slower than 4 seconds are skipped. Set it empty to turn suggestions off. |
 
 ## How it works
 

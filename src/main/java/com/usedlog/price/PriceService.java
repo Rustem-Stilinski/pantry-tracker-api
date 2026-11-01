@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -142,6 +143,22 @@ public class PriceService {
                         line.getQuantity(), line.getUnitPrice(), line.getLineTotal()))
                 .toList();
         return new ItemHistory(summarize(lines, storeNames), storePrices(lines, storeNames), points);
+    }
+
+    /**
+     * An item's price summary over all its purchases, in the unit it's most often bought in; empty when it
+     * has never been on a receipt. For a scanned barcode; the caller has already checked membership.
+     */
+    @Transactional(readOnly = true)
+    public Optional<ItemPrice> summaryFor(UUID householdId, String itemName) {
+        List<ReceiptItem> all = items.findByHouseholdIdAndItemKeyOrderByPurchasedAtAscLineNoAsc(
+                householdId, Text.itemKey(itemName));
+        if (all.isEmpty()) {
+            return Optional.empty();
+        }
+        String unit = mostCommonUnit(all);
+        List<ReceiptItem> lines = all.stream().filter(line -> line.getUnit().equalsIgnoreCase(unit)).toList();
+        return Optional.of(summarize(lines, storeNamesById(householdId)));
     }
 
     // ---------- store comparison ----------
