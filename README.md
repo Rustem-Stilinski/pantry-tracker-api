@@ -140,6 +140,13 @@ The web app reads a product's barcode with the phone camera and asks `GET /barco
   ("Fairlife 2% Reduced Fat Milk, 52 fl oz"). The person picks a name, ideally the one the item has on
   receipts so the scan finds its prices, and `PUT /barcodes/{code}` saves it for everyone in the log.
 
+**Codes printed on receipts.** Some stores print each line's item code; Safeway prints the UPC without
+its first and last digit (`2113050504` for UPC `0 21130 50504 3`). A receipt line keeps that code
+(`itemCode`, digits only). Scanning a barcode that no one has named checks the receipt lines for any way
+of printing it (in full, without the check digit, or a UPC without its end digits); a match links the
+barcode to that line's item on the spot, so the scan shows its prices with no naming step. Until then
+the code shows on the item (`GET /barcodes?item=…`, `source: "receipt"`).
+
 **How prices link to a UPC.** Receipts print product names, not UPCs, so every price is filed under
 the item's name (`item_key`: lower case, single spaces). A barcode stores the item name too, and its
 prices are the receipt lines with the same key. Linking a UPC from the item's own price page (the web

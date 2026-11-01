@@ -52,12 +52,14 @@ public class AnthropicReceiptReader implements ReceiptReader {
 
             Rules:
             - One entry in items per purchased line. Skip lines that are not products: subtotal, tax, total,
-              payment, change, savings summaries, loyalty points, barcodes.
+              payment, change, savings summaries, loyalty points, the receipt's own barcode.
             - name: the short product name a person would use, written out instead of receipt abbreviations,
               with the size or count when it is printed. "GV 2% MLK GAL" becomes "Milk 2%, 1 gal";
               "LG AA EGGS 12CT" becomes "Eggs, large, 12 ct". If the product is one of the household's
               existing items listed in the message, use that exact name.
             - receiptText: the line exactly as printed.
+            - itemCode: the product's item code or UPC when the receipt prints one for that line (digits only, as
+              printed: some stores print the UPC without its first and last digit); null when none is printed.
             - quantity and unit: for items sold by weight use the weight and its unit (2.31 lb). Otherwise
               use the count and "pcs" (3 pcs when the line says 3 @ 1.29). Use another unit such as "gal"
               only when the receipt states it.

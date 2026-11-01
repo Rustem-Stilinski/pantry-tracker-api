@@ -35,6 +35,6 @@ public interface ReceiptReader {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record DraftItem(String receiptText, String name, BigDecimal quantity, String unit, BigDecimal unitPrice,
-                     BigDecimal lineTotal, String category) {
+                     BigDecimal lineTotal, String category, String itemCode) {
     }
 }

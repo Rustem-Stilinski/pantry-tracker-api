@@ -120,6 +120,15 @@ status=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X DELETE -H
 call GET "/api/households/$hid/barcodes/0036000291452" | jq -e '.known == false' > /dev/null
 check "a UPC can be unlinked"
 
+# A receipt that prints each line's UPC without its end digits (Safeway): scanning the package links it.
+at=$(date -u -d "-30 minutes" +%Y-%m-%dT%H:%M:%SZ)
+call POST "/api/households/$hid/receipts" "{\"storeName\":\"Safeway\",\"purchasedAt\":\"$at\",\"items\":[
+  {\"name\":\"Signature jasmine rice\",\"itemCode\":\"2113050504\",\"quantity\":1,\"unit\":\"pcs\",\"unitPrice\":3.49,\"lineTotal\":3.49,\"category\":\"Pantry\"}]}" \
+  | jq -e '.items[0].itemCode == "2113050504"' > /dev/null
+call GET "/api/households/$hid/barcodes/021130505043?format=upc_a" \
+  | jq -e '.known and .itemName == "Signature jasmine rice" and .receiptCode == "2113050504" and .prices.latestStore == "Safeway"' > /dev/null
+check "a UPC printed on a receipt links the product when it's scanned"
+
 status=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$BASE/api/households/$hid/barcodes/036000291453")
 [[ "$status" == "400" ]] || { echo "expected 400 for a bad check digit, got $status"; exit 1; }
 check "a misread barcode is refused"

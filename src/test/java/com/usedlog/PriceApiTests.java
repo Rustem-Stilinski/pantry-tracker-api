@@ -296,7 +296,7 @@ class PriceApiTests {
         when(reader.read(anyList(), anyList(), anyList())).thenReturn(new ReceiptDraft(
                 "Giant", "4500 Lee Hwy, Arlington, VA 22207", "2026-10-20", "14:05", "USD",
                 List.of(new DraftItem("GNT LG EGGS 12CT", "Eggs, large, 12 ct", BigDecimal.ONE, "pcs",
-                        new BigDecimal("3.49"), new BigDecimal("3.49"), "Dairy & eggs")),
+                        new BigDecimal("3.49"), new BigDecimal("3.49"), "Dairy & eggs", null)),
                 new BigDecimal("3.49"), new BigDecimal("0.21"), new BigDecimal("3.70"), null));
 
         mvc.perform(multipart("/api/households/{id}/receipts/read", hid)

@@ -2,8 +2,11 @@ package com.usedlog.barcode;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
@@ -17,6 +20,8 @@ import com.usedlog.barcode.BarcodeDtos.Suggestion;
 import com.usedlog.common.Text;
 import com.usedlog.household.HouseholdService;
 import com.usedlog.price.PriceService;
+import com.usedlog.price.ReceiptItem;
+import com.usedlog.price.ReceiptItemRepository;
 
 /**
  * Scanning: a barcode the household has named opens that item with its prices; a new one comes back
@@ -26,14 +31,16 @@ import com.usedlog.price.PriceService;
 public class BarcodeService {
 
     private final BarcodeItemRepository barcodes;
+    private final ReceiptItemRepository receiptLines;
     private final HouseholdService households;
     private final PriceService prices;
     private final ProductLookup productLookup;
     private final Clock clock;
 
-    public BarcodeService(BarcodeItemRepository barcodes, HouseholdService households, PriceService prices,
-                          ProductLookup productLookup, Clock clock) {
+    public BarcodeService(BarcodeItemRepository barcodes, ReceiptItemRepository receiptLines,
+                          HouseholdService households, PriceService prices, ProductLookup productLookup, Clock clock) {
         this.barcodes = barcodes;
+        this.receiptLines = receiptLines;
         this.households = households;
         this.prices = prices;
         this.productLookup = productLookup;
@@ -49,12 +56,21 @@ public class BarcodeService {
         String code = normalize(rawCode, format);
         Optional<BarcodeItem> named = barcodes.findByHouseholdIdAndCode(householdId, code);
         if (named.isPresent()) {
-            return known(householdId, code, named.get().getItemName());
+            return known(householdId, code, named.get().getItemName(), null);
+        }
+        // A receipt line printing this barcode's code: link it to that item, no naming needed.
+        Optional<ReceiptItem> onReceipt = receiptLines.findFirstByHouseholdIdAndItemCodeInOrderByPurchasedAtDesc(
+                householdId, Barcodes.receiptForms(code));
+        if (onReceipt.isPresent()) {
+            ReceiptItem line = onReceipt.get();
+            barcodes.save(new BarcodeItem(householdId, code, line.getItemName(), line.getItemKey(), userId,
+                    clock.instant()));
+            return known(householdId, code, line.getItemName(), line.getItemCode());
         }
         Suggestion suggestion = productLookup.find(code)
                 .map(p -> new Suggestion(p.name(), p.brand(), p.size(), p.source()))
                 .orElse(null);
-        return new BarcodeLookup(code, false, null, suggestion, null);
+        return new BarcodeLookup(code, false, null, suggestion, null, null);
     }
 
     /** Names a barcode, or renames it if it was named before. */
@@ -68,20 +84,37 @@ public class BarcodeService {
         barcodes.findByHouseholdIdAndCode(householdId, code).ifPresentOrElse(
                 existing -> existing.rename(name, key, now),
                 () -> barcodes.save(new BarcodeItem(householdId, code, name, key, userId, now)));
-        return known(householdId, code, name);
+        return known(householdId, code, name, null);
     }
 
     /**
-     * The barcodes linked to an item (matched like prices: by name, ignoring case and spacing), oldest first;
-     * with no item, every barcode in the log, by item.
+     * The codes linked to an item (matched like prices: by name, ignoring case and spacing): scanned barcodes
+     * first, then codes printed on its receipt lines that no scanned barcode already covers. With no item,
+     * every one in the log, by item.
      */
     @Transactional(readOnly = true)
     public List<ItemBarcode> forItem(UUID householdId, UUID userId, String item) {
         households.requireMember(householdId, userId);
-        List<BarcodeItem> found = item == null || item.isBlank()
+        String key = item == null || item.isBlank() ? null : Text.itemKey(item);
+        List<BarcodeItem> scanned = key == null
                 ? barcodes.findByHouseholdIdOrderByItemKeyAscCreatedAtAsc(householdId)
-                : barcodes.findByHouseholdIdAndItemKeyOrderByCreatedAtAsc(householdId, Text.itemKey(item));
-        return found.stream().map(b -> new ItemBarcode(b.getCode(), b.getItemName())).toList();
+                : barcodes.findByHouseholdIdAndItemKeyOrderByCreatedAtAsc(householdId, key);
+        List<ItemBarcode> result = new ArrayList<>();
+        Set<String> covered = new HashSet<>();
+        for (BarcodeItem b : scanned) {
+            result.add(new ItemBarcode(b.getCode(), b.getItemName(), "scan"));
+            covered.addAll(Barcodes.receiptForms(b.getCode()));
+        }
+        Set<String> seen = new HashSet<>();
+        for (ReceiptItem line : receiptLines.findByHouseholdIdAndItemCodeIsNotNullOrderByPurchasedAtDesc(householdId)) {
+            if (key != null && !key.equals(line.getItemKey())) {
+                continue;
+            }
+            if (!covered.contains(line.getItemCode()) && seen.add(line.getItemKey() + "\u0000" + line.getItemCode())) {
+                result.add(new ItemBarcode(line.getItemCode(), line.getItemName(), "receipt"));
+            }
+        }
+        return result;
     }
 
     /** Unlinks a barcode from its item; scanning it again asks for a name. */
@@ -95,8 +128,9 @@ public class BarcodeService {
         barcodes.delete(found);
     }
 
-    private BarcodeLookup known(UUID householdId, String code, String itemName) {
-        return new BarcodeLookup(code, true, itemName, null, prices.summaryFor(householdId, itemName).orElse(null));
+    private BarcodeLookup known(UUID householdId, String code, String itemName, String receiptCode) {
+        return new BarcodeLookup(code, true, itemName, null, prices.summaryFor(householdId, itemName).orElse(null),
+                receiptCode);
     }
 
     private static String normalize(String rawCode, String format) {
