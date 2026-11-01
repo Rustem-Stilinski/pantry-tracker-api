@@ -2,6 +2,7 @@ package com.usedlog.barcode;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.usedlog.barcode.BarcodeDtos.BarcodeLookup;
+import com.usedlog.barcode.BarcodeDtos.ItemBarcode;
 import com.usedlog.barcode.BarcodeDtos.Suggestion;
 import com.usedlog.common.Text;
 import com.usedlog.household.HouseholdService;
@@ -67,6 +69,29 @@ public class BarcodeService {
                 existing -> existing.rename(name, key, now),
                 () -> barcodes.save(new BarcodeItem(householdId, code, name, key, userId, now)));
         return known(householdId, code, name);
+    }
+
+    /** The barcodes linked to an item (matched like prices: by name, ignoring case and spacing), oldest first. */
+    @Transactional(readOnly = true)
+    public List<ItemBarcode> forItem(UUID householdId, UUID userId, String item) {
+        households.requireMember(householdId, userId);
+        if (item == null || item.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Say which item, e.g. ?item=Milk 2%, 1 gal.");
+        }
+        return barcodes.findByHouseholdIdAndItemKeyOrderByCreatedAtAsc(householdId, Text.itemKey(item)).stream()
+                .map(b -> new ItemBarcode(b.getCode(), b.getItemName()))
+                .toList();
+    }
+
+    /** Unlinks a barcode from its item; scanning it again asks for a name. */
+    @Transactional
+    public void unlink(UUID householdId, UUID userId, String rawCode) {
+        households.requireMember(householdId, userId);
+        String code = normalize(rawCode, null);
+        BarcodeItem found = barcodes.findByHouseholdIdAndCode(householdId, code)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "That barcode isn't linked to an item."));
+        barcodes.delete(found);
     }
 
     private BarcodeLookup known(UUID householdId, String code, String itemName) {

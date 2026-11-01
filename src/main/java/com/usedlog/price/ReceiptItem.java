@@ -85,6 +85,11 @@ public class ReceiptItem {
         this.category = category;
     }
 
+    /** Keeps the copy of the receipt's date in step when the receipt's date is corrected. */
+    public void changePurchasedAt(Instant purchasedAt) {
+        this.purchasedAt = purchasedAt;
+    }
+
     public UUID getId() {
         return id;
     }

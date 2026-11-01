@@ -109,9 +109,26 @@ check "named a barcode; it shows the item's receipt prices"
 call GET "/api/households/$hid/barcodes/0036000291452" | jq -e '.known and .itemName == "eggs, 12 CT"' > /dev/null
 check "scanning it again (as EAN-13) finds the same item"
 
+call GET "/api/households/$hid/barcodes?item=Eggs%2C%2012%20ct" | jq -e 'length == 1 and .[0].code == "0036000291452"' > /dev/null
+check "an item lists its UPCs"
+
+status=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -c "$JAR" -X DELETE -H "X-XSRF-TOKEN: $(xsrf)" \
+  "$BASE/api/households/$hid/barcodes/0036000291452")
+[[ "$status" == "204" ]] || { echo "expected 204 unlinking a UPC, got $status"; exit 1; }
+call GET "/api/households/$hid/barcodes/0036000291452" | jq -e '.known == false' > /dev/null
+check "a UPC can be unlinked"
+
 status=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" "$BASE/api/households/$hid/barcodes/036000291453")
 [[ "$status" == "400" ]] || { echo "expected 400 for a bad check digit, got $status"; exit 1; }
 check "a misread barcode is refused"
+
+# Correcting a receipt's date moves it out of this month.
+before=$(call GET "/api/households/$hid/receipts?month=$month&tz=UTC")
+rid=$(jq -r '.[0].id' <<< "$before")
+moved=$(date -u -d "-40 days" +%Y-%m-%dT%H:%M:%SZ)
+call PATCH "/api/households/$hid/receipts/$rid" "{\"purchasedAt\":\"$moved\"}" | jq -e --arg at "$moved" '.purchasedAt == $at' > /dev/null
+call GET "/api/households/$hid/receipts?month=$month&tz=UTC" | jq -e --argjson n "$(jq 'length' <<< "$before")" 'length == $n - 1' > /dev/null
+check "a receipt's date can be corrected"
 
 # Reading photos: 503 without an API key (as in CI); with a key, a fake photo can't be read (4xx/5xx).
 printf 'not really a photo' > /tmp/smoke-receipt.jpg

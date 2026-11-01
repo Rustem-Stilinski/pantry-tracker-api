@@ -27,6 +27,10 @@ public final class BarcodeDtos {
     public record Suggestion(String name, String brand, String size, String source) {
     }
 
+    /** A barcode linked to an item: "0036000291452" is "Fairlife 2% milk". */
+    public record ItemBarcode(String code, String itemName) {
+    }
+
     /** Names (or renames) a barcode. Use the name the item has on receipts to see its prices. */
     public record SaveBarcodeRequest(@NotBlank @Size(max = 80) String itemName) {
     }

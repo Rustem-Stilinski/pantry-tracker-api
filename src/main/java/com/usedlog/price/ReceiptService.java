@@ -23,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.usedlog.common.MonthRange;
 import com.usedlog.common.Text;
 import com.usedlog.household.HouseholdService;
+import com.usedlog.price.PriceDtos.ChangeReceiptRequest;
 import com.usedlog.price.PriceDtos.ItemRequest;
 import com.usedlog.price.PriceDtos.ReaderStatus;
 import com.usedlog.price.PriceDtos.ReceiptAlias;
@@ -158,6 +159,21 @@ public class ReceiptService {
         Receipt receipt = find(householdId, receiptId);
         String storeName = prices.storeNamesById(householdId).getOrDefault(receipt.getStoreId(), "");
         return detail(receipt, storeName, items.findByReceiptIdOrderByLineNoAsc(receipt.getId()));
+    }
+
+    /** Corrects the date: the receipt and its lines move together, so lists, history and spending follow. */
+    @Transactional
+    public ReceiptDetail changeDate(UUID householdId, UUID userId, UUID receiptId, ChangeReceiptRequest request) {
+        households.requireMember(householdId, userId);
+        if (request.purchasedAt().isAfter(clock.instant().plus(Duration.ofDays(1)))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "purchasedAt can't be in the future.");
+        }
+        Receipt receipt = find(householdId, receiptId);
+        receipt.changePurchasedAt(request.purchasedAt());
+        List<ReceiptItem> lines = items.findByReceiptIdOrderByLineNoAsc(receipt.getId());
+        lines.forEach(line -> line.changePurchasedAt(request.purchasedAt()));
+        String storeName = prices.storeNamesById(householdId).getOrDefault(receipt.getStoreId(), "");
+        return detail(receipt, storeName, lines);
     }
 
     @Transactional

@@ -1,11 +1,14 @@
 package com.usedlog;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -122,6 +125,41 @@ class BarcodeApiTests {
                 .andExpect(jsonPath("$.prices").isEmpty());
         mvc.perform(get("/api/households/{id}/barcodes/{code}", hid, MILK_UPC_A).session(alex))
                 .andExpect(jsonPath("$.itemName").value("Oat milk"));
+    }
+
+    @Test
+    void anItemListsItsUpcsAndOneCanBeUnlinked() throws Exception {
+        MockHttpSession alex = register("Alex");
+        String hid = createHousehold(alex);
+        name(alex, hid, MILK_EAN_13, "Fairlife 2% milk");
+        name(alex, hid, "4006381333931", "fairlife  2% MILK");
+        name(alex, hid, "96385074", "Oat milk");
+
+        // Matched like prices: by name, ignoring case and spacing.
+        mvc.perform(get("/api/households/{id}/barcodes", hid).param("item", " FAIRLIFE 2% milk").session(alex))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[*].code", containsInAnyOrder(MILK_EAN_13, "4006381333931")));
+
+        // Unlinked by the code as scanned (UPC-A): the stored EAN-13 goes.
+        mvc.perform(delete("/api/households/{id}/barcodes/{code}", hid, MILK_UPC_A).session(alex).with(xsrf()))
+                .andExpect(status().isNoContent());
+        mvc.perform(get("/api/households/{id}/barcodes", hid).param("item", "Fairlife 2% milk").session(alex))
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].code").value("4006381333931"))
+                .andExpect(jsonPath("$[0].itemName").value("fairlife 2% MILK"));
+        mvc.perform(get("/api/households/{id}/barcodes/{code}", hid, MILK_EAN_13).session(alex))
+                .andExpect(jsonPath("$.known").value(false));
+        mvc.perform(delete("/api/households/{id}/barcodes/{code}", hid, MILK_EAN_13).session(alex).with(xsrf()))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/households/{id}/barcodes/{code}", hid, "96385074").session(alex))
+                .andExpect(status().isForbidden());
+
+        MockHttpSession pat = register("Pat");
+        mvc.perform(get("/api/households/{id}/barcodes", hid).param("item", "Oat milk").session(pat))
+                .andExpect(status().isNotFound());
+        mvc.perform(delete("/api/households/{id}/barcodes/{code}", hid, "96385074").session(pat).with(xsrf()))
+                .andExpect(status().isNotFound());
     }
 
     @Test
